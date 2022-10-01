@@ -1,0 +1,4 @@
+[submodule "PotreeConverter"]
+	path = PotreeConverter
+	url = https://github.com/dddpt/PotreeConverter.git
+	branch = develop
