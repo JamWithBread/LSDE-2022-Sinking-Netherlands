@@ -1,0 +1,6 @@
+[submodule "PotreeConverter"]
+	path = PotreeConverter
+	url = https://github.com/dddpt/PotreeConverter.git
+[submodule "potree"]
+	path = potree
+	url = https://github.com/potree/potree.git
