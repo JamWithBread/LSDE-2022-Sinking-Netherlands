@@ -16,7 +16,7 @@ Step 5: Create simple map visualization (not directly animated from point cloud 
 
 ## Pros of this method:
  - Straightforward, hardest part will probably be the partitioning of the regions and lining them up with a graphical map of the netherlands to apply shading to
- - Don't have to worry about rendering point cloud images (although it would be cool) or reliability of ML models (filtering step elimiated this need)
+ - Don't have to worry about rendering point cloud images (although it would be cool) or reliability of ML models - just compares the data directly in a simple way
 ## Cons of this method
 - average height measure might not be sensitive enough to detect sinking in a region
 - Might still end up with a lot of data --> sample less but then the average could be even less reliable - must find a balance
