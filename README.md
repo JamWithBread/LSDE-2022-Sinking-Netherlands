@@ -3,12 +3,16 @@ LSDE Assignment 2, Group02
 
 # Approach 3
 
+Note: After realizing the AHN2 dataset is unlabeled, will need to make a separate step 1 for this dataset where we first use ML to create labels, such as in this example: https://pure.tudelft.nl/ws/portalfiles/portal/54920903/isprs_annals_IV_2_W5_445_2019.pdf
+
 Step 1: Reduce data size
   - Use point cloud classification labels to filter dataset, ie only keep data points with Ground (2), maybe: low vegatation (3), low point (7)? and maybe: road surface (11, could be a problem with raised highways) 
   
 Step 2: Establish sea level reference, ie something we can treat as a reference elevation between the ANH2 and ANH3 datasets
 
-Step 3: Adjust this step accordingly later, but for now use some heuristic to partition the data into say 100 regions. Do this for both ANH2 and ANH3 datasets so there is an old(ANH2) and a new (ANH3 version for each region.
+Step 3: 
+ - Adjust this step accordingly later, but for now use some heuristic to partition the data into say 100 regions. Do this for both ANH2 and ANH3 datasets so there is an old(ANH2) and a new (ANH3 version for each region. 
+ - TODO: How to get the many smaller ANH2 files synced with the larger ANH3 / what points are from the same region?
 
 Step 4: Sample some reasonable amount of datapoints for each region, measure them relative to the sea level reference, get an average elevation for the region. Now we can compare average evelation between the two time periods. For regions where there is a difference, can now "zoom in" and apply the same pipeline again, but on a smaller area and keep more data points.
 
