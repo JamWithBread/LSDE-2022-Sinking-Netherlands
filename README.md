@@ -1,6 +1,20 @@
 # LSDE-2022-Sinking-Netherlands
 LSDE Assignment 2, Group02
 
+# Approach 3
+
+Step 1: Reduce data size
+  - Use point cloud classification labels to filter dataset, ie only keep data points with Ground (2), maybe: low vegatation (3), low point (7)? and maybe: road surface (11, could be a problem with raised highways) 
+  
+Step 2: Establish sea level reference, ie something we can treat as a reference elevation between the ANH2 and ANH3 datasets
+
+Step 3: Adjust this step accordingly later, but for now use some heuristic to partition the data into say 100 regions. Do this for both ANH2 and ANH3 datasets so there is an old and a new version for each region.
+
+Step 4: Sample some reasonable amount of datapoints for each region, measure them relative to the sea level reference, get an average elevation for the region. Now we can compare average evelation between the two time periods? For regions where there is a difference, can now "zoom in" and apply the same pipeline again, but on a smaller area and keep more data points.
+
+Step 5: Create simple map visualization (not directly animated from point cloud data) where the degree of average elevation change is indicated by shading of the 100 regions. Can click on a region and the map zooms in, new sub shadings are shown for the zoomed in region. 
+
+
 # Approach 2
 General idea is create a machine learning model that given a x and y coordinate predicts z (height) (potentially swap y and z). We can then query our model and obtain a height map and make it more accurate by querying for more points in the current FOV (if we query in a "grid" pattern for x and y we can easily generate a 2d map of squares with as height the average of the 4 points of its corner). This approach is nice because we can just train the model on as much data as possible, we don't have to wory about overfitting (the model doesn't need to predict anything but the data) and can naturally increase the detail when zooming in by querying more. The bad part is that we are relying on us being able to create a model that actually reasonably approximates the height. If the error of our model is in the order of the difference in heights between ahn2 and ahn3 then what we render obviously doesn't have a lot of meaning. Hence the things that we need to figure out as soon as possible would be:
 
