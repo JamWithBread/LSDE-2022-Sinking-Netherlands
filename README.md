@@ -11,15 +11,18 @@ LSDE Assignment 2, Group02
 ### Step 1: Reduce data size
   - Use point cloud classification labels to filter dataset, ie only keep data points with Ground (2). Only 5 classifications are available in the AHN3 dataset ( Ground, vegetation, building, bridge, and water). Intuitively, the ground label seems like the only reliable class to compare between the dataset s for the purpose of measuing land elevation.
   
-### Step 2: Establish sea level reference, ie something we can treat as a reference elevation between the ANH2 and ANH3 datasets
+### Step 2: 
+Establish sea level reference, ie something we can treat as a reference elevation between the ANH2 and ANH3 datasets
 
 ### Step 3: 
  - Adjust this step accordingly later, but for now use some heuristic to partition the data into say 100 regions. Do this for both ANH2 and ANH3 datasets so there is an old(ANH2) and a new (ANH3 version for each region. 
  - TODO: How to get the many smaller ANH2 files synced with the larger ANH3 / what points are from the same region?
 
-### Step 4: Sample some reasonable amount of datapoints for each region, measure them relative to the sea level reference, get an average elevation for the region. Now we can compare average evelation between the two time periods. For regions where there is a difference, can now "zoom in" and apply the same pipeline again, but on a smaller area and keep more data points.
+### Step 4: 
+Sample some reasonable amount of datapoints for each region, measure them relative to the sea level reference, get an average elevation for the region. Now we can compare average evelation between the two time periods. For regions where there is a difference, can now "zoom in" and apply the same pipeline again, but on a smaller area and keep more data points.
 
-### Step 5: Create simple map visualization (not directly animated from point cloud data) where the degree of average elevation change is indicated by shading of the 100 regions. Can click on a region and the map zooms in, new sub shadings are shown for the zoomed in region. 
+### Step 5: 
+Create simple map visualization (not directly animated from point cloud data) where the degree of average elevation change is indicated by shading of the 100 regions. Can click on a region and the map zooms in, new sub shadings are shown for the zoomed in region. 
 
 ## Pros of this method:
  - Straightforward, hardest part will probably be the partitioning of the regions and lining them up with a graphical map of the netherlands to apply shading to + working with the ML model. 
