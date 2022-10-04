@@ -1,13 +1,13 @@
 # Databricks notebook source
-#%pip install laspy[laszip]
-#%pip install open3d
-#%pip install pylas
+# MAGIC %pip install laspy[laszip]
+# MAGIC #%pip install open3d
+# MAGIC #%pip install pylas
 
 # COMMAND ----------
 
 import sys, os
-import laspy, pylas
-import open3d as o3d
+import laspy#, pylas
+#import open3d as o3d
 import numpy as np
 import pandas as pd
 import logging
@@ -97,13 +97,114 @@ las = las[0:1000]
 point_data = np.stack([las.X, las.Y, las.Z], axis=0).transpose((1, 0))
 point_data
 
-geom = o3d.geometry.PointCloud()
-geom.points = o3d.utility.Vector3dVector(point_data)
-o3d.visualization.draw_geometries([geom])
+
+
+# COMMAND ----------
+
+las = laspy.read('/dbfs/mnt/lsde/datasets/ahn2/tileslaz/tile_0_2/ahn_017000_363000.laz')
+
+
+# COMMAND ----------
+
+list(las.point_format.dimension_names)
+
+# COMMAND ----------
+
+#How the data looks
+print(len(las.X),"points in a single file")
+
+# COMMAND ----------
+
+set(list(las.classification))
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC # File sizes
 
 # COMMAND ----------
 
 
+
+# COMMAND ----------
+
+# File size of single AHN3 file - Compressed
+size = os.path.getsize('/dbfs/mnt/lsde/datasets/ahn3/C_01CZ1.LAZ')
+print(size/(10**9), "GB")
+# Decompressed object:
+las = laspy.read('/dbfs/mnt/lsde/datasets/ahn3/C_01CZ1.LAZ')
+
+# COMMAND ----------
+
+#File size of single AHN2 file
+size = os.path.getsize('/dbfs/mnt/lsde/datasets/ahn2/tileslaz/tile_0_2/ahn_017000_363000.laz')
+print(size/(10**9), "GB")
+# Decompressed object:
+'/dbfs/mnt/lsde/datasets/ahn2/tileslaz/tile_0_2/ahn_017000_363000.laz'
+
+# COMMAND ----------
+
+print(type(las))
+
+# COMMAND ----------
+
+print(sys.getsizeof(las.X[0]))
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## Get total file count and overall size for ahn2 LAZ files
+
+# COMMAND ----------
+
+total_size = 0
+num_files = 0
+directory = '/dbfs/mnt/lsde/datasets/ahn2/tileslaz'
+for folder in os.listdir(directory):
+    #print(directoryfolder)
+    if os.path.isdir(directory+"/"+folder):
+        for filename in os.listdir(directory+"/"+folder):
+            f = os.path.join(directory+"/"+folder, filename)
+            # checking if it is a file
+            if os.path.isfile(f):
+                num_files+=1
+                total_size+= os.path.getsize(f)
+
+# COMMAND ----------
+
+print(num_files, "files")
+print(total_size/10**9," GB")
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## Get total file count and overall size for ahn3 LAZ files
+
+# COMMAND ----------
+
+import zipfile
+
+# COMMAND ----------
+
+total_size = 0
+num_files = 0
+skip_zips = -1
+directory = '/dbfs/mnt/lsde/datasets/ahn3'
+for filename in os.listdir(directory):
+    skip_zips +=1
+    if skip_zips <= 7:
+        continue
+    f = os.path.join(directory, filename)
+    # checking if it is a file
+    if os.path.isfile(f):
+        total_size += os.path.getsize(f)
+        num_files +=1
+
+
+# COMMAND ----------
+
+print(num_files, "files")
+print(total_size/10**9," GB")
 
 # COMMAND ----------
 
