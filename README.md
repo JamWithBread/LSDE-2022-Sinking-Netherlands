@@ -3,10 +3,13 @@ LSDE Assignment 2, Group02
 
 # Approach 3
 
-Note: After realizing the AHN2 dataset is unlabeled, will need to make a separate step 1 for this dataset where we first use ML to create labels, such as in this example: https://pure.tudelft.nl/ws/portalfiles/portal/54920903/isprs_annals_IV_2_W5_445_2019.pdf
+### step 0: ML Model for AHN2 classes
+- Note: After realizing the AHN2 dataset is unlabeled, will need to make a separate step 1 for this dataset where we first use ML to create labels, such as in this example: https://pure.tudelft.nl/ws/portalfiles/portal/54920903/isprs_annals_IV_2_W5_445_2019.pdf
+- Use PointNet Model 1 (Section 3.2 of paper) to make ground / not ground classifications of AHN2 dataset. Only keep ground points from result. 
+- Impressively accurate
 
 Step 1: Reduce data size
-  - Use point cloud classification labels to filter dataset, ie only keep data points with Ground (2), maybe: low vegatation (3), low point (7)? and maybe: road surface (11, could be a problem with raised highways) 
+  - Use point cloud classification labels to filter dataset, ie only keep data points with Ground (2). Only 5 classifications are available in the AHN3 dataset ( Ground, vegetation, building, bridge, and water). Intuitively, the ground label seems like the only reliable class to compare between the dataset s for the purpose of measuing land elevation.
   
 Step 2: Establish sea level reference, ie something we can treat as a reference elevation between the ANH2 and ANH3 datasets
 
@@ -19,8 +22,8 @@ Step 4: Sample some reasonable amount of datapoints for each region, measure the
 Step 5: Create simple map visualization (not directly animated from point cloud data) where the degree of average elevation change is indicated by shading of the 100 regions. Can click on a region and the map zooms in, new sub shadings are shown for the zoomed in region. 
 
 ## Pros of this method:
- - Straightforward, hardest part will probably be the partitioning of the regions and lining them up with a graphical map of the netherlands to apply shading to
- - Don't have to worry about rendering point cloud images (although it would be cool) or reliability of ML models - just compares the data directly in a simple way
+ - Straightforward, hardest part will probably be the partitioning of the regions and lining them up with a graphical map of the netherlands to apply shading to + working with the ML model. 
+ - Don't have to worry about rendering point cloud images (although it would be cool) - just compares the data directly in a simple way
 ## Cons of this method
 - average height measure might not be sensitive enough to detect sinking in a region
 - Might still end up with a lot of data --> sample less but then the average could be even less reliable - must find a balance
