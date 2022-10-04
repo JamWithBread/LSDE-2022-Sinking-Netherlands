@@ -4,7 +4,7 @@ LSDE Assignment 2, Group02
 # Approach 3
 
 ### Step 0: ML Model for AHN2 classes
-- Note: After realizing the AHN2 dataset is unlabeled, hence this step 0 for this dataset where we first use ML to create labels, such as in this example: https://pure.tudelft.nl/ws/portalfiles/portal/54920903/isprs_annals_IV_2_W5_445_2019.pdf
+- Note: Realized the AHN2 dataset is unlabeled, hence this step 0 for this dataset where we first use ML to create labels, such as in this example: https://pure.tudelft.nl/ws/portalfiles/portal/54920903/isprs_annals_IV_2_W5_445_2019.pdf
 - Use PointNet Model 1 (Section 3.2 of paper) to make ground / not ground classifications of AHN2 dataset. Only keep ground points from result. 
 - Impressively accurate
 
