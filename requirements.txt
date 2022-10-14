@@ -1,4 +1,5 @@
 lazrs
+alphashape
 laspy~=2.2.0
 setuptools~=65.3.0
 numpy~=1.23.3
