@@ -1,23 +1,12 @@
-import {useRef, useEffect} from 'react'
 import './App.css'
-import Renderer from "./three/Renderer";
-
+import RenderContainer from "./three/RenderContainer";
 
 function App() {
-  // let isFirstTime = useRef(true)
-  // useEffect(() => {
-  //   if (!isFirstTime.current) {
-  //     return
-  //   }
-  //   return () => {
-  //     isFirstTime.current = false
-  //   }
-  // }, [])
-  return (
-      <div className="App">
-        <Renderer></Renderer>
-      </div>
-  )
+    return (
+        <div className="App">
+            <RenderContainer></RenderContainer>
+        </div>
+    )
 }
 
 export default App
