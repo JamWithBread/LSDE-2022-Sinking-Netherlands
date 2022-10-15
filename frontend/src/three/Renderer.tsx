@@ -44,9 +44,10 @@ function initScene(ref: React.RefObject<HTMLElement>): () => void {
     // const meshData =
 
     const [mesh1, edges1] = createMesh(
-        new Float32Array(mesh_data.positions),
+        mesh_data.positions,
         mesh_data.color,
     )
+    mesh1.visible = true
     scene.add(mesh1)
     scene.add(edges1)
 
@@ -94,13 +95,37 @@ function createSkyboxMesh() {
 }
 
 
-function createMesh(vertices: Float32Array, color: string) {
+function createMesh(vertices: number[], color: string) {
     const geometry = new THREE.BufferGeometry();
-    geometry.setAttribute('position', new THREE.BufferAttribute(vertices, 3))
-    const material = new THREE.MeshBasicMaterial({
-        color: color,
-        side: THREE.DoubleSide,
-    })
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3))
+    const material = new THREE.ShaderMaterial({
+        uniforms: {
+            color1: {
+                value: new THREE.Color(0x006994),
+            },
+            color2: {
+                value: new THREE.Color(0xf48037)
+            }
+        },
+        vertexShader: `
+            varying vec3 positionVertex;
+
+            void main() {
+                positionVertex = position; 
+                gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); 
+            }
+        `,
+        fragmentShader: `
+            uniform vec3 color1;
+            uniform vec3 color2;
+
+            varying vec3 positionVertex;
+
+            void main() {
+                gl_FragColor = vec4(mix(color1, color2, pow(positionVertex.y, 0.4) - 0.75), 1.0);
+            }
+        `,
+    });
     const mesh = new THREE.Mesh(geometry, material)
     const edges = new THREE.EdgesGeometry(geometry);
     const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({
