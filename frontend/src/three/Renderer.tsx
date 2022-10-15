@@ -1,4 +1,4 @@
-import React, {useEffect, useRef} from 'react'
+import React, {useEffect, useRef, useState} from 'react'
 import * as THREE from 'three'
 import {FlyControls} from './Control'
 import {shade} from "../utils/color";
@@ -8,12 +8,16 @@ const cameraFOV = 75
 const cameraNear = 0.1
 const cameraFar = 1000
 
-function initScene(ref: React.RefObject<HTMLElement>): () => void {
+const mesh1Name = "mesh1"
+
+function initScene(ref: React.RefObject<HTMLElement>) {
+    let width = window.innerWidth * 0.9
+    let height = window.innerHeight
     const scene = new THREE.Scene()
 
     const camera = new THREE.PerspectiveCamera(
         cameraFOV,
-        window.innerWidth / window.innerHeight,
+        width / height,
         cameraNear,
         cameraFar
     )
@@ -25,12 +29,15 @@ function initScene(ref: React.RefObject<HTMLElement>): () => void {
     controls.domElement = renderer.domElement;
     controls.rollSpeed = Math.PI / 3;
 
-    renderer.setSize(window.innerWidth, window.innerHeight)
+    renderer.setSize(width, height)
 
     const htmlEl = ref.current
     if (htmlEl == null) {
         console.error("rendererDivRef is null; can't mount threejs renderer to it")
-        return () => {
+        return {
+            root: scene,
+            cleanup: () => {
+            }
         }
     }
     htmlEl.appendChild(renderer.domElement)
@@ -41,13 +48,11 @@ function initScene(ref: React.RefObject<HTMLElement>): () => void {
     const axesHelper = new THREE.AxesHelper(5);
     scene.add(axesHelper);
 
-    // const meshData =
-
     const [mesh1, edges1] = createMesh(
         mesh_data.positions,
         mesh_data.color,
+        mesh1Name
     )
-    mesh1.visible = true
     scene.add(mesh1)
     scene.add(edges1)
 
@@ -55,18 +60,18 @@ function initScene(ref: React.RefObject<HTMLElement>): () => void {
 
     function animate() {
         requestAnimationFrame(animate)
-
-        const delta = clock.getDelta();
-        controls.update(delta);
-
+        const delta = clock.getDelta()
+        controls.update(delta)
         renderer.render(scene, camera)
-
     }
 
     animate()
 
-    return () => {
-        htmlEl.removeChild(renderer.domElement)
+    return {
+        root: scene,
+        cleanup: () => {
+            htmlEl.removeChild(renderer.domElement)
+        }
     }
 }
 
@@ -95,7 +100,7 @@ function createSkyboxMesh() {
 }
 
 
-function createMesh(vertices: number[], color: string) {
+function createMesh(vertices: number[], color: string, name?: string): [THREE.Mesh, THREE.LineSegments] {
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3))
     const material = new THREE.ShaderMaterial({
@@ -127,6 +132,9 @@ function createMesh(vertices: number[], color: string) {
         `,
     });
     const mesh = new THREE.Mesh(geometry, material)
+    if (typeof name !== 'undefined') {
+        mesh.name = name
+    }
     const edges = new THREE.EdgesGeometry(geometry);
     const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({
         color: shade(color, -0.5),
@@ -135,14 +143,31 @@ function createMesh(vertices: number[], color: string) {
     return [mesh, line]
 }
 
-function Renderer() {
+type RenderProps = {
+    isRenderingMesh1: boolean;
+}
+
+function Renderer(props: RenderProps) {
     const rendererDivRef = useRef<HTMLDivElement>(null)
+    const [root, setRoot] = useState<THREE.Object3D | null>(null)
+
     useEffect(() => {
-        const cleanup = initScene(rendererDivRef)
+        const {root: rootScene, cleanup} = initScene(rendererDivRef)
+        setRoot(rootScene)
         return () => {
             cleanup()
         }
     }, [])
+    useEffect(() => {
+        if (root === null) {
+            return
+        }
+        const mesh1 = root.getObjectByName(mesh1Name)
+        if (typeof mesh1 === 'undefined') {
+            return
+        }
+        mesh1.visible = !mesh1.visible
+    }, [props.isRenderingMesh1])
     return (
         <div ref={rendererDivRef}>
 
