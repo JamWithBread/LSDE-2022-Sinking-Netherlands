@@ -10,7 +10,43 @@ const cameraFar = 1000
 
 const mesh1Name = "mesh1"
 
-function initScene(ref: React.RefObject<HTMLElement>) {
+type RenderProps = {
+    isRenderingMesh1: boolean;
+}
+
+type TrackedObjects = {
+    [mesh1Name]?: THREE.Object3D;
+}
+
+function Renderer(props: RenderProps) {
+    const rendererDivRef = useRef<HTMLDivElement>(null)
+    const [trackedObjects, setTrackedObjects] = useState<TrackedObjects | null>(null)
+
+    useEffect(() => {
+        const {trackedObjects: to, cleanup} = initScene(rendererDivRef)
+        setTrackedObjects(to)
+        return () => {
+            cleanup()
+        }
+    }, [])
+    useEffect(() => {
+        if (trackedObjects === null) {
+            return
+        }
+        const mesh1 = trackedObjects[mesh1Name]
+        if (typeof mesh1 === 'undefined') {
+            return
+        }
+        mesh1.visible = !mesh1.visible
+    }, [props.isRenderingMesh1])
+    return (
+        <div ref={rendererDivRef}>
+
+        </div>
+    )
+}
+
+function initScene(ref: React.RefObject<HTMLElement>): { trackedObjects: TrackedObjects, cleanup: () => void } {
     let width = window.innerWidth * 0.9
     let height = window.innerHeight
     const scene = new THREE.Scene()
@@ -35,7 +71,7 @@ function initScene(ref: React.RefObject<HTMLElement>) {
     if (htmlEl == null) {
         console.error("rendererDivRef is null; can't mount threejs renderer to it")
         return {
-            root: scene,
+            trackedObjects: {},
             cleanup: () => {
             }
         }
@@ -68,7 +104,9 @@ function initScene(ref: React.RefObject<HTMLElement>) {
     animate()
 
     return {
-        root: scene,
+        trackedObjects: {
+            [mesh1Name]: mesh1
+        },
         cleanup: () => {
             htmlEl.removeChild(renderer.domElement)
         }
@@ -141,38 +179,6 @@ function createMesh(vertices: number[], color: string, name?: string): [THREE.Me
         linewidth: 3,  // Due to limitations of the OpenGL Core Profile with the WebGL renderer on most platforms linewidth will always be 1 regardless of the set value.
     }));
     return [mesh, line]
-}
-
-type RenderProps = {
-    isRenderingMesh1: boolean;
-}
-
-function Renderer(props: RenderProps) {
-    const rendererDivRef = useRef<HTMLDivElement>(null)
-    const [root, setRoot] = useState<THREE.Object3D | null>(null)
-
-    useEffect(() => {
-        const {root: rootScene, cleanup} = initScene(rendererDivRef)
-        setRoot(rootScene)
-        return () => {
-            cleanup()
-        }
-    }, [])
-    useEffect(() => {
-        if (root === null) {
-            return
-        }
-        const mesh1 = root.getObjectByName(mesh1Name)
-        if (typeof mesh1 === 'undefined') {
-            return
-        }
-        mesh1.visible = !mesh1.visible
-    }, [props.isRenderingMesh1])
-    return (
-        <div ref={rendererDivRef}>
-
-        </div>
-    )
 }
 
 export default Renderer
