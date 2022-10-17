@@ -2,7 +2,8 @@ import React, {useEffect, useRef, useState} from 'react'
 import * as THREE from 'three'
 import {FlyControls} from './Control'
 import {shade} from "../utils/color";
-import mesh_data from '../mesh_data/random_sample_1665765047.json';
+import mesh_data from '../mesh_data/map_netherlands.json';
+// import mesh_data from '../mesh_data/random_sample_1665765047.json';
 
 const cameraFOV = 75
 const cameraNear = 0.1
@@ -165,9 +166,10 @@ function createMesh(vertices: number[], color: string, name?: string): [THREE.Me
             varying vec3 positionVertex;
 
             void main() {
-                gl_FragColor = vec4(mix(color1, color2, pow(positionVertex.y, 0.4) - 0.75), 1.0);
+                gl_FragColor = vec4(mix(color1, color2, pow(positionVertex.y, 0.4)), 1.0);
             }
         `,
+        side: THREE.DoubleSide
     });
     const mesh = new THREE.Mesh(geometry, material)
     if (typeof name !== 'undefined') {
