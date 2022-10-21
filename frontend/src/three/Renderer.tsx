@@ -2,8 +2,6 @@ import React, {useEffect, useRef, useState} from 'react'
 import * as THREE from 'three'
 import {FlyControls} from './Control'
 import {shade} from "../utils/color";
-import mesh_data from '../mesh_data/map_netherlands.json';
-// import mesh_data from '../mesh_data/random_sample_1665765047.json';
 
 const cameraFOV = 75
 const cameraNear = 0.1
@@ -24,12 +22,17 @@ function Renderer(props: RenderProps) {
     const [trackedObjects, setTrackedObjects] = useState<TrackedObjects | null>(null)
 
     useEffect(() => {
-        const {trackedObjects: to, cleanup} = initScene(rendererDivRef)
-        setTrackedObjects(to)
+        (async () => {
+            const res = await initScene(rendererDivRef)
+            setTrackedObjects(res.trackedObjects)
+        })();
+
         return () => {
-            cleanup()
-        }
-    }, [])
+            // TODO i dont know enough about async to fix this
+            // initScene returns a cleanup function in res and we would like to acces it but cannot
+            // res.cleanup()
+        };
+    }, []);
     useEffect(() => {
         if (trackedObjects === null) {
             return
@@ -47,7 +50,7 @@ function Renderer(props: RenderProps) {
     )
 }
 
-function initScene(ref: React.RefObject<HTMLElement>): { trackedObjects: TrackedObjects, cleanup: () => void } {
+async function initScene(ref: React.RefObject<HTMLElement>): Promise<{ trackedObjects: TrackedObjects, cleanup: () => void }> {
     let width = window.innerWidth * 0.9
     let height = window.innerHeight
     const scene = new THREE.Scene()
@@ -85,9 +88,7 @@ function initScene(ref: React.RefObject<HTMLElement>): { trackedObjects: Tracked
     const axesHelper = new THREE.AxesHelper(5);
     scene.add(axesHelper);
 
-    const [mesh1, edges1] = createMesh(
-        mesh_data.positions,
-        mesh_data.color,
+    const [mesh1, edges1] = await createMesh(
         mesh1Name
     )
     scene.add(mesh1)
@@ -115,10 +116,10 @@ function initScene(ref: React.RefObject<HTMLElement>): { trackedObjects: Tracked
 }
 
 function createSkyboxMesh() {
-    const baseFilename = process.env.PUBLIC_URL + "/skybox/galaxy/galaxy";
+    const baseUrl = process.env.PUBLIC_URL + "/skybox/galaxy/galaxy";
     const fileType = ".png";
     const sides = ["+Z", "-Z", "+Y", "-Y", "+X", "-X"];
-    const pathStrings = sides.map(side => baseFilename + side + fileType)
+    const pathStrings = sides.map(side => baseUrl + side + fileType)
     const materialArray = pathStrings.map(image =>
         new THREE.MeshBasicMaterial({
             map: new THREE.TextureLoader().load(
@@ -139,9 +140,10 @@ function createSkyboxMesh() {
 }
 
 
-function createMesh(vertices: number[], color: string, name?: string): [THREE.Mesh, THREE.LineSegments] {
-    const geometry = new THREE.BufferGeometry();
-    geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3))
+async function createMesh(name?: string): Promise<[THREE.Mesh, THREE.LineSegments]> {
+    const loader = new THREE.BufferGeometryLoader();
+    const url = process.env.PUBLIC_URL + "/mesh_data/random_triangles_999999.json";
+
     const material = new THREE.ShaderMaterial({
         uniforms: {
             color1: {
@@ -170,14 +172,18 @@ function createMesh(vertices: number[], color: string, name?: string): [THREE.Me
             }
         `,
         side: THREE.DoubleSide
-    });
+    })
+    const geometry = await loader.loadAsync(
+        url,
+    )
+
     const mesh = new THREE.Mesh(geometry, material)
     if (typeof name !== 'undefined') {
         mesh.name = name
     }
     const edges = new THREE.EdgesGeometry(geometry);
     const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({
-        color: shade(color, -0.5),
+        color: shade('#006994', -0.5),
         linewidth: 3,  // Due to limitations of the OpenGL Core Profile with the WebGL renderer on most platforms linewidth will always be 1 regardless of the set value.
     }));
     return [mesh, line]

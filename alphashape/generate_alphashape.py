@@ -13,11 +13,12 @@ import shapely
 parser = argparse.ArgumentParser(description='Create mesh data data dump')
 parser.add_argument('-p', '--path', type=str, help='path of np array')
 parser.add_argument('-a', '--alpha', type=float, default=1.1)
+parser.add_argument('-n', '--number', type=int, default=10)
 parser.add_argument('-f', '--filename', type=str)
 args = parser.parse_args()
 
 dims = 2 if args.path else 3
-coordinates = np.load(args.path) if args.path else np.random.random_sample((11, dims))
+coordinates = np.load(args.path) if args.path else np.random.random_sample((args.number, dims))
 
 r = lambda: random.randint(0, 255)
 
