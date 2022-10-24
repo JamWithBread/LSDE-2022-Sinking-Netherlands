@@ -3,18 +3,24 @@ import * as THREE from 'three'
 import {FlyControls} from './Control'
 import {shade} from "../utils/color"
 import axios from 'axios'
+import metadata from '../chunks/_metadata.json'
+
+console.log("metadata: ")
+console.log(metadata)
 
 const cameraFOV = 75
 const cameraNear = 0.1
 const cameraFar = 1000
 
-const minX = -1
-const minZ = -1
-const maxX = 1
-const maxZ = 1
+const nFetchPerFrame = 20
 
-const columns = 64
-const rows = 64
+const minX = metadata.minX
+const minZ = metadata.minZ
+const maxX = metadata.maxX
+const maxZ = metadata.maxZ
+
+const columns = metadata.columns
+const rows = metadata.rows
 const chunks = columns * rows
 
 const columnSize = (maxX - minX) / columns
@@ -23,34 +29,27 @@ const rowSize = (maxZ - minZ) / rows
 const toFetch: ChunkBufferInfo[] = []
 type ChunkBufferInfo = {
     id: string,
-    column: number,
-    row: number,
+    // column: number,
+    // row: number,
     level: number,
-    isValid: boolean,
     minBufferIdx: number,
 }
 
-const MAX_TRIANGLES_PER_CHUNK = 512
+const MAX_TRIANGLES_PER_CHUNK = metadata.maxTriangles
 const geometry = new THREE.BufferGeometry();
 const BUFFER_SIZE_PER_CHUNK = MAX_TRIANGLES_PER_CHUNK * 9
 const positions = new Float32Array(BUFFER_SIZE_PER_CHUNK * chunks); // 3 vertices per point
 const chunkInfoMap: { [k: string]: ChunkBufferInfo } = {}
 
 let counter = 0
-for (let i = 0; i < columns; i++) {
-    for (let j = 0; j < rows; j++) {
-        const level = 0
-        const chunkId = createChunkId(i, j)
-        chunkInfoMap[chunkId] = {
-            id: chunkId,
-            column: i,
-            row: j,
-            level: -1,
-            isValid: true,
-            minBufferIdx: counter * BUFFER_SIZE_PER_CHUNK,
-        }
-        counter++
+for (const id of metadata.chunkIds) {
+    const level = -1
+    chunkInfoMap[id] = {
+        id: id,
+        level: level,
+        minBufferIdx: counter * BUFFER_SIZE_PER_CHUNK,
     }
+    counter++
 }
 
 
@@ -181,17 +180,17 @@ function initScene(ref: React.RefObject<HTMLElement>): { trackedObjects: Tracked
 
     function animate() {
         updateChunks(camera.position.x, camera.position.y, camera.position.z)
-        const chunkToFetch = toFetch.pop()
-        if (chunkToFetch !== undefined) {
-            fetchChunk(chunkToFetch.id, chunkToFetch.level).then(positions => updateChunk(chunkToFetch, positions))
+        for (let i = 0; i < nFetchPerFrame && toFetch.length > 0; i++) {
+            const chunkToFetch = toFetch.pop()
+            if (chunkToFetch !== undefined) {
+                fetchChunk(chunkToFetch.id, chunkToFetch.level).then(positions => updateChunk(chunkToFetch, positions))
+            }
         }
 
         requestAnimationFrame(animate)
         const delta = clock.getDelta()
         controls.update(delta)
         renderer.render(scene, camera)
-
-
     }
 
     animate()
@@ -231,13 +230,7 @@ function createSkyboxMesh() {
     return skyboxMesh
 }
 
-function updateChunk(chunkInfo: ChunkBufferInfo, positions_chunk?: Float32Array) {
-    if (positions_chunk === undefined) {
-        // not all chunks have data, e.g. it is water for now we just try to get these chunks anyway and get a 404 which will make positions be undefined
-        // we might be able to handle this in a better way
-        chunkInfo.isValid = false
-        return
-    }
+function updateChunk(chunkInfo: ChunkBufferInfo, positions_chunk: Float32Array) {
 
     const positions_current = mesh.geometry.attributes.position.array;
 
@@ -287,15 +280,11 @@ function updateChunk(chunkInfo: ChunkBufferInfo, positions_chunk?: Float32Array)
     mesh.geometry.attributes.position.needsUpdate = true
 }
 
-async function fetchChunk(chunkId: string, level: number): Promise<Float32Array | undefined> {
+async function fetchChunk(chunkId: string, level: number): Promise<Float32Array> {
     const url = `${process.env.PUBLIC_URL}/chunks/${chunkId}_${level}.json`
+    // console.log("fetching: " + url)
     // const url = `${process.env.PUBLIC_URL}/chunks/0_0.json`
-    let res
-    try {
-        res = await axios.get(url)
-    } catch (e) {
-        return undefined
-    }
+    const res = await axios.get(url)
     const positions = res.data.positions
     return positions
 }
@@ -315,19 +304,12 @@ function positionToChunkId(x: number, z: number): string {
 }
 
 async function updateChunks(x: number, y: number, z: number): Promise<void> {
-    for (let i = 0; i < columns; i++) {
-        for (let j = 0; j < rows; j++) {
-            const chunkId = createChunkId(i, j)
-            const chunkInfo = chunkInfoMap[chunkId]
-            if (!chunkInfo.isValid) {
-                continue
-            }
-
-            const calculatedLevel = calculateLevel(chunkInfo, x, y, z)
-            if (calculatedLevel !== chunkInfo.level) {
-                chunkInfo.level = calculatedLevel
-                toFetch.push(chunkInfo)
-            }
+    for (const id of metadata.chunkIds) {
+        const chunkInfo = chunkInfoMap[id]
+        const calculatedLevel = calculateLevel(chunkInfo, x, y, z)
+        if (calculatedLevel !== chunkInfo.level) {
+            chunkInfo.level = calculatedLevel
+            toFetch.push(chunkInfo)
         }
     }
     // console.log(toFetch)
