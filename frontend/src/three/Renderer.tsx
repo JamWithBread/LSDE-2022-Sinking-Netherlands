@@ -3,30 +3,30 @@ import * as THREE from 'three'
 import {FlyControls} from './Control'
 import {shade} from "../utils/color"
 import axios from 'axios'
-import metadata from '../chunks/_metadata.json'
+import metadata_ahn3 from '../chunks/ahn3/_metadata.json'
+import metadata_ahn2 from '../chunks/ahn2/_metadata.json'
 
-console.log("metadata: ")
-console.log(metadata)
-
-const cameraFOV = 75
+const cameraFOV = 50
 const cameraNear = 0.1
 const cameraFar = 1000
 
-const nFetchPerFrame = 20
+const nFetchPerFrame = 10
 
-const minX = metadata.minX
-const minZ = metadata.minZ
-const maxX = metadata.maxX
-const maxZ = metadata.maxZ
+const minX = metadata_ahn3.minX
+const minZ = metadata_ahn3.minZ
+const maxX = metadata_ahn3.maxX
+const maxZ = metadata_ahn3.maxZ
 
-const columns = metadata.columns
-const rows = metadata.rows
+const columns = metadata_ahn3.columns
+const rows = metadata_ahn3.rows
 const chunks = columns * rows
 
 const columnSize = (maxX - minX) / columns
 const rowSize = (maxZ - minZ) / rows
 
-const toFetch: ChunkBufferInfo[] = []
+const toFetchAHN3: ChunkBufferInfo[] = []
+const toFetchAHN2: ChunkBufferInfo[] = []
+
 type ChunkBufferInfo = {
     id: string,
     // column: number,
@@ -35,44 +35,44 @@ type ChunkBufferInfo = {
     minBufferIdx: number,
 }
 
-const MAX_TRIANGLES_PER_CHUNK = metadata.maxTriangles
-const geometry = new THREE.BufferGeometry();
+const MAX_TRIANGLES_PER_CHUNK = metadata_ahn3.maxTriangles
+const geometryAHN3 = new THREE.BufferGeometry()
+const geometryAHN2 = new THREE.BufferGeometry()
 const BUFFER_SIZE_PER_CHUNK = MAX_TRIANGLES_PER_CHUNK * 9
-const positions = new Float32Array(BUFFER_SIZE_PER_CHUNK * chunks); // 3 vertices per point
-const chunkInfoMap: { [k: string]: ChunkBufferInfo } = {}
+const positionsAHN3 = new Float32Array(BUFFER_SIZE_PER_CHUNK * chunks); // 3 vertices per point
+const positionsAHN2 = new Float32Array(BUFFER_SIZE_PER_CHUNK * chunks); // 3 vertices per point
 
-let counter = 0
-for (const id of metadata.chunkIds) {
-    const level = -1
-    chunkInfoMap[id] = {
-        id: id,
-        level: level,
-        minBufferIdx: counter * BUFFER_SIZE_PER_CHUNK,
+function createChunkInfoMap(chunkIds: string[]): { [k: string]: ChunkBufferInfo } {
+    const chunkInfoMap: { [k: string]: ChunkBufferInfo } = {}
+    let counter = 0
+    for (const id of chunkIds) {
+        const level = -1
+        chunkInfoMap[id] = {
+            id: id,
+            level: level,
+            minBufferIdx: counter * BUFFER_SIZE_PER_CHUNK,
+        }
+        counter++
     }
-    counter++
+    return chunkInfoMap
 }
 
+const chunkInfoMapAHN3 = createChunkInfoMap(metadata_ahn3.chunkIds)
+const chunkInfoMapAHN2 = createChunkInfoMap(metadata_ahn2.chunkIds)
 
-geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+geometryAHN3.setAttribute('position', new THREE.BufferAttribute(positionsAHN3, 3));
+geometryAHN2.setAttribute('position', new THREE.BufferAttribute(positionsAHN2, 3));
 
-const material = new THREE.ShaderMaterial({
-    uniforms: {
-        color1: {
-            value: new THREE.Color(0x006994),
-        },
-        color2: {
-            value: new THREE.Color(0xf48037)
-        }
-    },
-    vertexShader: `
+const vertexShader = `
             varying vec3 positionVertex;
 
             void main() {
                 positionVertex = position;
                 gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
             }
-        `,
-    fragmentShader: `
+        `
+
+const fragmentShader = `
             uniform vec3 color1;
             uniform vec3 color2;
 
@@ -81,25 +81,79 @@ const material = new THREE.ShaderMaterial({
             void main() {
                 gl_FragColor = vec4(mix(color1, color2, pow(positionVertex.y, 0.4)), 1.0);
             }
-        `,
+        `
+
+const materialAHN3 = new THREE.ShaderMaterial({
+    uniforms: {
+        color1: {
+            value: new THREE.Color(0x5800FF),
+        },
+        color2: {
+            value: new THREE.Color(0x00D7FF)
+        }
+    },
+    vertexShader: vertexShader,
+    fragmentShader: fragmentShader,
     side: THREE.DoubleSide
 })
 
+const materialAHN2 = new THREE.ShaderMaterial({
+    uniforms: {
+        color1: {
+            value: new THREE.Color(0xFF00E4),
+        },
+        color2: {
+            value: new THREE.Color(0xFDB9FC)
+        }
+    },
+    vertexShader: vertexShader,
+    fragmentShader: fragmentShader,
+    side: THREE.DoubleSide
+})
 // const material = new THREE.MeshPhongMaterial({
 //     color: 0xFF0000,    // red (can also use a CSS color string here)
 //     flatShading: true,
 // });
 
-const mesh = new THREE.Mesh(geometry, material)
+const meshAHN3 = new THREE.Mesh(geometryAHN3, materialAHN3)
+const meshAHN3Name = "mesh_ahn3"
+meshAHN3.name = meshAHN3Name
 
-const mesh1Name = "mesh1"
+const meshAHN2 = new THREE.Mesh(geometryAHN2, materialAHN2)
+const meshAHN2Name = "mesh_ahn2"
+meshAHN2.name = meshAHN2Name
+
+
+const waterGeometry = new THREE.BufferGeometry();
+// create a simple square shape. We duplicate the top left and bottom right
+// vertices because each vertex needs to appear once per triangle.
+
+// itemSize = 3 because there are 3 values (components) per vertex
+waterGeometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array([
+    minX, 0, minZ,
+    minX, 0, maxZ,
+    maxX, 0, maxZ,
+
+    minX, 0, minZ,
+    maxX, 0, maxZ,
+    maxX, 0, minZ,
+]), 3))
+const waterMaterial = new THREE.MeshBasicMaterial({color: 0x005477})
+const waterMesh = new THREE.Mesh(waterGeometry, waterMaterial);
+const waterName = "water"
+waterMesh.name = waterName
 
 type RenderProps = {
-    isRenderingMesh1: boolean;
+    isRenderingMeshAHN3: boolean
+    isRenderingMeshAHN2: boolean
+    isRenderingWater: boolean
+    waterHeight: number
 }
 
 type TrackedObjects = {
-    [mesh1Name]?: THREE.Object3D;
+    [meshAHN3Name]?: THREE.Mesh;
+    [meshAHN2Name]?: THREE.Mesh;
+    [waterName]?: THREE.Mesh;
 }
 
 function Renderer(props: RenderProps) {
@@ -118,12 +172,49 @@ function Renderer(props: RenderProps) {
         if (trackedObjects === null) {
             return
         }
-        const mesh1 = trackedObjects[mesh1Name]
-        if (typeof mesh1 === 'undefined') {
+        const mesh = trackedObjects[meshAHN3Name]
+        if (typeof mesh === 'undefined') {
             return
         }
-        mesh1.visible = !mesh1.visible
-    }, [props.isRenderingMesh1])
+        mesh.visible = !mesh.visible
+    }, [props.isRenderingMeshAHN3])
+    useEffect(() => {
+        if (trackedObjects === null) {
+            return
+        }
+        const mesh = trackedObjects[meshAHN2Name]
+        if (typeof mesh === 'undefined') {
+            return
+        }
+        mesh.visible = !mesh.visible
+    }, [props.isRenderingMeshAHN2])
+    useEffect(() => {
+        if (trackedObjects === null) {
+            return
+        }
+        const mesh = trackedObjects[waterName]
+        if (typeof mesh === 'undefined') {
+            return
+        }
+        mesh.visible = !mesh.visible
+    }, [props.isRenderingWater])
+    useEffect(() => {
+        if (trackedObjects === null) {
+            return
+        }
+        const mesh = trackedObjects[waterName]
+        if (typeof mesh === 'undefined') {
+            return
+        }
+
+        const positions_current = mesh.geometry.attributes.position.array;
+
+        for (let i = 1; i < positions_current.length; i += 3) {
+            // @ts-ignore
+            positions_current[i] = props.waterHeight
+        }
+        mesh.geometry.attributes.position.needsUpdate = true
+    }, [props.waterHeight])
     return (
         <div ref={rendererDivRef}>
 
@@ -169,21 +260,25 @@ function initScene(ref: React.RefObject<HTMLElement>): { trackedObjects: Tracked
     const axesHelper = new THREE.AxesHelper(5);
     scene.add(axesHelper);
 
-    const [mesh1, edges1] = createMesh(
-        mesh1Name
-    )
+    scene.add(meshAHN3)
+    scene.add(meshAHN2)
 
-    scene.add(mesh1)
-    scene.add(edges1)
+    scene.add(waterMesh)
 
     camera.position.z = 5
 
     function animate() {
         updateChunks(camera.position.x, camera.position.y, camera.position.z)
-        for (let i = 0; i < nFetchPerFrame && toFetch.length > 0; i++) {
-            const chunkToFetch = toFetch.pop()
+        for (let i = 0; i < nFetchPerFrame && toFetchAHN3.length > 0; i++) {
+            const chunkToFetch = toFetchAHN3.pop()
             if (chunkToFetch !== undefined) {
-                fetchChunk(chunkToFetch.id, chunkToFetch.level).then(positions => updateChunk(chunkToFetch, positions))
+                fetchChunk(3, chunkToFetch.id, chunkToFetch.level).then(positions => updateChunk(3, chunkToFetch, positions))
+            }
+        }
+        for (let i = 0; i < nFetchPerFrame && toFetchAHN2.length > 0; i++) {
+            const chunkToFetch = toFetchAHN2.pop()
+            if (chunkToFetch !== undefined) {
+                fetchChunk(2, chunkToFetch.id, chunkToFetch.level).then(positions => updateChunk(2, chunkToFetch, positions))
             }
         }
 
@@ -198,7 +293,9 @@ function initScene(ref: React.RefObject<HTMLElement>): { trackedObjects: Tracked
 
     return {
         trackedObjects: {
-            [mesh1Name]: mesh1
+            [meshAHN3Name]: meshAHN3,
+            [meshAHN2Name]: meshAHN2,
+            [waterName]: waterMesh,
         },
         cleanup: () => {
             htmlEl.removeChild(renderer.domElement)
@@ -230,16 +327,19 @@ function createSkyboxMesh() {
     return skyboxMesh
 }
 
-function updateChunk(chunkInfo: ChunkBufferInfo, positions_chunk: Float32Array) {
+function updateChunk(ahn: number, chunkInfo: ChunkBufferInfo, positions_chunk: Float32Array) {
 
-    const positions_current = mesh.geometry.attributes.position.array;
+    let position
+    if (ahn === 3) {
+        position = meshAHN3.geometry.attributes.position;
+    } else {
+        position = meshAHN2.geometry.attributes.position;
+    }
+    const positions_current = position.array
 
     const start = chunkInfo.minBufferIdx
     const endOfPositions = chunkInfo.minBufferIdx + positions_chunk.length
     const end = chunkInfo.minBufferIdx + BUFFER_SIZE_PER_CHUNK
-    // console.log("start " + (start))
-    // console.log("positions_length " + (endOfPositions - start))
-    // console.log(positions_chunk)
     if (start % 9 !== 0) {
         console.error("start should be divisible by 9: " + start)
         return
@@ -247,16 +347,11 @@ function updateChunk(chunkInfo: ChunkBufferInfo, positions_chunk: Float32Array) 
     for (let i = start; i < endOfPositions; i++) {
         // @ts-ignore
         positions_current[i] = positions_chunk[i - start]
-        // console.log(i-start)
     }
-    // for (let i = 0; i < positions_chunk.length; i++) {
-    //     // @ts-ignore
-    //     positions_current[i] = positions_chunk[i]
-    // }
     // TODO setting to 0 is unnecessary if we're zooming in but I doubt that it takes a significant amount of time
     for (let i = endOfPositions; i < end; i++) {
         // @ts-ignore
-        // positions_current[i] = 0
+        positions_current[i] = 0
     }
     // // @ts-ignore
     // positions_current[0] = 3
@@ -277,11 +372,12 @@ function updateChunk(chunkInfo: ChunkBufferInfo, positions_chunk: Float32Array) 
     // // @ts-ignore
     // positions_current[8] = 2
 
-    mesh.geometry.attributes.position.needsUpdate = true
+    position.needsUpdate = true
+
 }
 
-async function fetchChunk(chunkId: string, level: number): Promise<Float32Array> {
-    const url = `${process.env.PUBLIC_URL}/chunks/${chunkId}_${level}.json`
+async function fetchChunk(ahn: number, chunkId: string, level: number): Promise<Float32Array> {
+    const url = `${process.env.PUBLIC_URL}/chunks/ahn${ahn}/${chunkId}_${level}.json`
     // console.log("fetching: " + url)
     // const url = `${process.env.PUBLIC_URL}/chunks/0_0.json`
     const res = await axios.get(url)
@@ -289,35 +385,37 @@ async function fetchChunk(chunkId: string, level: number): Promise<Float32Array>
     return positions
 }
 
-function positionToChunkId(x: number, z: number): string {
-    const isXValid = x >= minX || x <= maxX
-    const isZValid = z >= minZ || z <= maxZ
-    if (!isXValid || !isZValid) {
-        throw new Error(`Received invalid coordinates x=${x} valid? ${isXValid}, z=${z} valid? ${isZValid}`)
-    }
-    let level = 0
-    // TODO implement some logic to set level based on z value
-    const column = Math.floor((x / columnSize))
-    const row = Math.floor((z / rowSize))
-    const chunkId = createChunkId(column, row)
-    return chunkId
-}
+// function positionToChunkId(x: number, z: number): string {
+//     const isXValid = x >= minX || x <= maxX
+//     const isZValid = z >= minZ || z <= maxZ
+//     if (!isXValid || !isZValid) {
+//         throw new Error(`Received invalid coordinates x=${x} valid? ${isXValid}, z=${z} valid? ${isZValid}`)
+//     }
+//     let level = 0
+//     // TODO implement some logic to set level based on z value
+//     const column = Math.floor((x / columnSize))
+//     const row = Math.floor((z / rowSize))
+//     const chunkId = createChunkId(column, row)
+//     return chunkId
+// }
 
 async function updateChunks(x: number, y: number, z: number): Promise<void> {
-    for (const id of metadata.chunkIds) {
-        const chunkInfo = chunkInfoMap[id]
+    for (const id of metadata_ahn2.chunkIds) {
+        const chunkInfo = chunkInfoMapAHN2[id]
         const calculatedLevel = calculateLevel(chunkInfo, x, y, z)
         if (calculatedLevel !== chunkInfo.level) {
             chunkInfo.level = calculatedLevel
-            toFetch.push(chunkInfo)
+            toFetchAHN2.push(chunkInfo)
         }
     }
-    // console.log(toFetch)
-    // console.log(toFetch.length)
-    // await Promise.all(toFetch.map(async chunkInfo => {
-    //     const positions = await fetchChunk(chunkInfo.id, chunkInfo.level)
-    //     updateChunk(chunkInfo, positions)
-    // }))
+    for (const id of metadata_ahn3.chunkIds) {
+        const chunkInfo = chunkInfoMapAHN3[id]
+        const calculatedLevel = calculateLevel(chunkInfo, x, y, z)
+        if (calculatedLevel !== chunkInfo.level) {
+            chunkInfo.level = calculatedLevel
+            toFetchAHN3.push(chunkInfo)
+        }
+    }
 }
 
 function calculateLevel(chunk: ChunkBufferInfo, x: number, y: number, z: number): number {
@@ -332,14 +430,13 @@ function createChunkId(column: number, row: number): string {
 
 function createMesh(name?: string): [THREE.Mesh, THREE.LineSegments] {
     if (typeof name !== 'undefined') {
-        mesh.name = name
     }
-    const edges = new THREE.EdgesGeometry(geometry);
+    const edges = new THREE.EdgesGeometry(geometryAHN3);
     const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({
         color: shade('#006994', -0.5),
         linewidth: 3,  // Due to limitations of the OpenGL Core Profile with the WebGL renderer on most platforms linewidth will always be 1 regardless of the set value.
     }));
-    return [mesh, line]
+    return [meshAHN3, line]
 }
 
 export default Renderer

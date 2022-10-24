@@ -5,16 +5,28 @@ import Toolbar from "./Toolbar";
 import {useState} from "react";
 
 function RenderContainer() {
-    const [isRenderingMesh1, setRenderingMesh1] = useState(false);
+    const [isRenderingMeshAHN3, setRenderingMeshAHN3] = useState(false)
+    const [isRenderingMeshAHN2, setRenderingMeshAHN2] = useState(false)
+    const [isRenderingWater, setRenderingWater] = useState(false)
+    const [waterHeight, setWaterHeight] = useState(0.0)
 
     return (
         <div style={{display: 'flex'}}>
             <Toolbar
-                isRenderingMesh1={isRenderingMesh1}
-                toggleRenderingMesh1={() => setRenderingMesh1(!isRenderingMesh1)}
+                isRenderingMeshAHN3={isRenderingMeshAHN3}
+                toggleRenderingMeshAHN3={() => setRenderingMeshAHN3(!isRenderingMeshAHN3)}
+                isRenderingMeshAHN2={isRenderingMeshAHN2}
+                toggleRenderingMeshAHN2={() => setRenderingMeshAHN2(!isRenderingMeshAHN2)}
+                isRenderingWater={isRenderingWater}
+                toggleRenderingWater={() => setRenderingWater(!isRenderingWater)}
+                waterHeight={waterHeight}
+                setWaterHeight={(height) => setWaterHeight(height)}
             />
             <Renderer
-                isRenderingMesh1={isRenderingMesh1}
+                isRenderingMeshAHN3={isRenderingMeshAHN3}
+                isRenderingMeshAHN2={isRenderingMeshAHN2}
+                isRenderingWater={isRenderingWater}
+                waterHeight={waterHeight}
             />
         </div>
     )
