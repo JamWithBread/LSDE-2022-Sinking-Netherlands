@@ -1,16 +1,228 @@
 import React, {useEffect, useRef, useState} from 'react'
 import * as THREE from 'three'
 import {FlyControls} from './Control'
-import {shade} from "../utils/color";
-import mesh_data from '../mesh_data/random_sample_1665765047.json';
+import {shade} from "../utils/color"
+import axios from 'axios'
+import metadata_ahn3 from '../chunks/ahn3/_metadata.json'
+import metadata_ahn2 from '../chunks/ahn2/_metadata.json'
 
-const cameraFOV = 75
+const cameraFOV = 50
 const cameraNear = 0.1
 const cameraFar = 1000
 
-const mesh1Name = "mesh1"
+const nFetchPerFrame = 10
 
-function initScene(ref: React.RefObject<HTMLElement>) {
+const minX = metadata_ahn3.minX
+const minZ = metadata_ahn3.minZ
+const maxX = metadata_ahn3.maxX
+const maxZ = metadata_ahn3.maxZ
+
+const columns = metadata_ahn3.columns
+const rows = metadata_ahn3.rows
+const chunks = columns * rows
+
+const columnSize = (maxX - minX) / columns
+const rowSize = (maxZ - minZ) / rows
+
+const toFetchAHN3: ChunkBufferInfo[] = []
+const toFetchAHN2: ChunkBufferInfo[] = []
+
+type ChunkBufferInfo = {
+    id: string,
+    // column: number,
+    // row: number,
+    level: number,
+    minBufferIdx: number,
+}
+
+const MAX_TRIANGLES_PER_CHUNK = metadata_ahn3.maxTriangles
+const geometryAHN3 = new THREE.BufferGeometry()
+const geometryAHN2 = new THREE.BufferGeometry()
+const BUFFER_SIZE_PER_CHUNK = MAX_TRIANGLES_PER_CHUNK * 9
+const positionsAHN3 = new Float32Array(BUFFER_SIZE_PER_CHUNK * chunks); // 3 vertices per point
+const positionsAHN2 = new Float32Array(BUFFER_SIZE_PER_CHUNK * chunks); // 3 vertices per point
+
+function createChunkInfoMap(chunkIds: string[]): { [k: string]: ChunkBufferInfo } {
+    const chunkInfoMap: { [k: string]: ChunkBufferInfo } = {}
+    let counter = 0
+    for (const id of chunkIds) {
+        const level = -1
+        chunkInfoMap[id] = {
+            id: id,
+            level: level,
+            minBufferIdx: counter * BUFFER_SIZE_PER_CHUNK,
+        }
+        counter++
+    }
+    return chunkInfoMap
+}
+
+const chunkInfoMapAHN3 = createChunkInfoMap(metadata_ahn3.chunkIds)
+const chunkInfoMapAHN2 = createChunkInfoMap(metadata_ahn2.chunkIds)
+
+geometryAHN3.setAttribute('position', new THREE.BufferAttribute(positionsAHN3, 3));
+geometryAHN2.setAttribute('position', new THREE.BufferAttribute(positionsAHN2, 3));
+
+const vertexShader = `
+            varying vec3 positionVertex;
+
+            void main() {
+                positionVertex = position;
+                gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+            }
+        `
+
+const fragmentShader = `
+            uniform vec3 color1;
+            uniform vec3 color2;
+
+            varying vec3 positionVertex;
+
+            void main() {
+                gl_FragColor = vec4(mix(color1, color2, pow(positionVertex.y, 0.4)), 1.0);
+            }
+        `
+
+const materialAHN3 = new THREE.ShaderMaterial({
+    uniforms: {
+        color1: {
+            value: new THREE.Color(0x5800FF),
+        },
+        color2: {
+            value: new THREE.Color(0x00D7FF)
+        }
+    },
+    vertexShader: vertexShader,
+    fragmentShader: fragmentShader,
+    side: THREE.DoubleSide
+})
+
+const materialAHN2 = new THREE.ShaderMaterial({
+    uniforms: {
+        color1: {
+            value: new THREE.Color(0xFF00E4),
+        },
+        color2: {
+            value: new THREE.Color(0xFDB9FC)
+        }
+    },
+    vertexShader: vertexShader,
+    fragmentShader: fragmentShader,
+    side: THREE.DoubleSide
+})
+// const material = new THREE.MeshPhongMaterial({
+//     color: 0xFF0000,    // red (can also use a CSS color string here)
+//     flatShading: true,
+// });
+
+const meshAHN3 = new THREE.Mesh(geometryAHN3, materialAHN3)
+const meshAHN3Name = "mesh_ahn3"
+meshAHN3.name = meshAHN3Name
+
+const meshAHN2 = new THREE.Mesh(geometryAHN2, materialAHN2)
+const meshAHN2Name = "mesh_ahn2"
+meshAHN2.name = meshAHN2Name
+
+
+const waterGeometry = new THREE.BufferGeometry();
+// create a simple square shape. We duplicate the top left and bottom right
+// vertices because each vertex needs to appear once per triangle.
+
+// itemSize = 3 because there are 3 values (components) per vertex
+waterGeometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array([
+    minX, 0, minZ,
+    minX, 0, maxZ,
+    maxX, 0, maxZ,
+
+    minX, 0, minZ,
+    maxX, 0, maxZ,
+    maxX, 0, minZ,
+]), 3))
+const waterMaterial = new THREE.MeshBasicMaterial({color: 0x005477})
+const waterMesh = new THREE.Mesh(waterGeometry, waterMaterial);
+const waterName = "water"
+waterMesh.name = waterName
+
+type RenderProps = {
+    isRenderingMeshAHN3: boolean
+    isRenderingMeshAHN2: boolean
+    isRenderingWater: boolean
+    waterHeight: number
+}
+
+type TrackedObjects = {
+    [meshAHN3Name]?: THREE.Mesh;
+    [meshAHN2Name]?: THREE.Mesh;
+    [waterName]?: THREE.Mesh;
+}
+
+function Renderer(props: RenderProps) {
+    const rendererDivRef = useRef<HTMLDivElement>(null)
+    const [trackedObjects, setTrackedObjects] = useState<TrackedObjects | null>(null)
+
+    useEffect(() => {
+        const res = initScene(rendererDivRef)
+        setTrackedObjects(res.trackedObjects)
+
+        return () => {
+            res.cleanup()
+        };
+    }, []);
+    useEffect(() => {
+        if (trackedObjects === null) {
+            return
+        }
+        const mesh = trackedObjects[meshAHN3Name]
+        if (typeof mesh === 'undefined') {
+            return
+        }
+        mesh.visible = !mesh.visible
+    }, [props.isRenderingMeshAHN3])
+    useEffect(() => {
+        if (trackedObjects === null) {
+            return
+        }
+        const mesh = trackedObjects[meshAHN2Name]
+        if (typeof mesh === 'undefined') {
+            return
+        }
+        mesh.visible = !mesh.visible
+    }, [props.isRenderingMeshAHN2])
+    useEffect(() => {
+        if (trackedObjects === null) {
+            return
+        }
+        const mesh = trackedObjects[waterName]
+        if (typeof mesh === 'undefined') {
+            return
+        }
+        mesh.visible = !mesh.visible
+    }, [props.isRenderingWater])
+    useEffect(() => {
+        if (trackedObjects === null) {
+            return
+        }
+        const mesh = trackedObjects[waterName]
+        if (typeof mesh === 'undefined') {
+            return
+        }
+
+        const positions_current = mesh.geometry.attributes.position.array;
+
+        for (let i = 1; i < positions_current.length; i += 3) {
+            // @ts-ignore
+            positions_current[i] = props.waterHeight
+        }
+        mesh.geometry.attributes.position.needsUpdate = true
+    }, [props.waterHeight])
+    return (
+        <div ref={rendererDivRef}>
+
+        </div>
+    )
+}
+
+function initScene(ref: React.RefObject<HTMLElement>): { trackedObjects: TrackedObjects, cleanup: () => void } {
     let width = window.innerWidth * 0.9
     let height = window.innerHeight
     const scene = new THREE.Scene()
@@ -35,7 +247,7 @@ function initScene(ref: React.RefObject<HTMLElement>) {
     if (htmlEl == null) {
         console.error("rendererDivRef is null; can't mount threejs renderer to it")
         return {
-            root: scene,
+            trackedObjects: {},
             cleanup: () => {
             }
         }
@@ -48,17 +260,28 @@ function initScene(ref: React.RefObject<HTMLElement>) {
     const axesHelper = new THREE.AxesHelper(5);
     scene.add(axesHelper);
 
-    const [mesh1, edges1] = createMesh(
-        mesh_data.positions,
-        mesh_data.color,
-        mesh1Name
-    )
-    scene.add(mesh1)
-    scene.add(edges1)
+    scene.add(meshAHN3)
+    scene.add(meshAHN2)
+
+    scene.add(waterMesh)
 
     camera.position.z = 5
 
     function animate() {
+        updateChunks(camera.position.x, camera.position.y, camera.position.z)
+        for (let i = 0; i < nFetchPerFrame && toFetchAHN3.length > 0; i++) {
+            const chunkToFetch = toFetchAHN3.pop()
+            if (chunkToFetch !== undefined) {
+                fetchChunk(3, chunkToFetch.id, chunkToFetch.level).then(positions => updateChunk(3, chunkToFetch, positions))
+            }
+        }
+        for (let i = 0; i < nFetchPerFrame && toFetchAHN2.length > 0; i++) {
+            const chunkToFetch = toFetchAHN2.pop()
+            if (chunkToFetch !== undefined) {
+                fetchChunk(2, chunkToFetch.id, chunkToFetch.level).then(positions => updateChunk(2, chunkToFetch, positions))
+            }
+        }
+
         requestAnimationFrame(animate)
         const delta = clock.getDelta()
         controls.update(delta)
@@ -67,8 +290,13 @@ function initScene(ref: React.RefObject<HTMLElement>) {
 
     animate()
 
+
     return {
-        root: scene,
+        trackedObjects: {
+            [meshAHN3Name]: meshAHN3,
+            [meshAHN2Name]: meshAHN2,
+            [waterName]: waterMesh,
+        },
         cleanup: () => {
             htmlEl.removeChild(renderer.domElement)
         }
@@ -76,10 +304,10 @@ function initScene(ref: React.RefObject<HTMLElement>) {
 }
 
 function createSkyboxMesh() {
-    const baseFilename = process.env.PUBLIC_URL + "/skybox/galaxy/galaxy";
+    const baseUrl = process.env.PUBLIC_URL + "/skybox/galaxy/galaxy";
     const fileType = ".png";
     const sides = ["+Z", "-Z", "+Y", "-Y", "+X", "-X"];
-    const pathStrings = sides.map(side => baseFilename + side + fileType)
+    const pathStrings = sides.map(side => baseUrl + side + fileType)
     const materialArray = pathStrings.map(image =>
         new THREE.MeshBasicMaterial({
             map: new THREE.TextureLoader().load(
@@ -99,80 +327,116 @@ function createSkyboxMesh() {
     return skyboxMesh
 }
 
+function updateChunk(ahn: number, chunkInfo: ChunkBufferInfo, positions_chunk: Float32Array) {
 
-function createMesh(vertices: number[], color: string, name?: string): [THREE.Mesh, THREE.LineSegments] {
-    const geometry = new THREE.BufferGeometry();
-    geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3))
-    const material = new THREE.ShaderMaterial({
-        uniforms: {
-            color1: {
-                value: new THREE.Color(0x006994),
-            },
-            color2: {
-                value: new THREE.Color(0xf48037)
-            }
-        },
-        vertexShader: `
-            varying vec3 positionVertex;
-
-            void main() {
-                positionVertex = position; 
-                gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); 
-            }
-        `,
-        fragmentShader: `
-            uniform vec3 color1;
-            uniform vec3 color2;
-
-            varying vec3 positionVertex;
-
-            void main() {
-                gl_FragColor = vec4(mix(color1, color2, pow(positionVertex.y, 0.4) - 0.75), 1.0);
-            }
-        `,
-    });
-    const mesh = new THREE.Mesh(geometry, material)
-    if (typeof name !== 'undefined') {
-        mesh.name = name
+    let position
+    if (ahn === 3) {
+        position = meshAHN3.geometry.attributes.position;
+    } else {
+        position = meshAHN2.geometry.attributes.position;
     }
-    const edges = new THREE.EdgesGeometry(geometry);
+    const positions_current = position.array
+
+    const start = chunkInfo.minBufferIdx
+    const endOfPositions = chunkInfo.minBufferIdx + positions_chunk.length
+    const end = chunkInfo.minBufferIdx + BUFFER_SIZE_PER_CHUNK
+    if (start % 9 !== 0) {
+        console.error("start should be divisible by 9: " + start)
+        return
+    }
+    for (let i = start; i < endOfPositions; i++) {
+        // @ts-ignore
+        positions_current[i] = positions_chunk[i - start]
+    }
+    // TODO setting to 0 is unnecessary if we're zooming in but I doubt that it takes a significant amount of time
+    for (let i = endOfPositions; i < end; i++) {
+        // @ts-ignore
+        positions_current[i] = 0
+    }
+    // // @ts-ignore
+    // positions_current[0] = 3
+    // // @ts-ignore
+    // positions_current[1] = 3
+    // // @ts-ignore
+    // positions_current[2] = 3
+    // // @ts-ignore
+    // positions_current[3] = 2
+    // // @ts-ignore
+    // positions_current[4] = 3
+    // // @ts-ignore
+    // positions_current[5] = 2
+    // // @ts-ignore
+    // positions_current[6] = 2
+    // // @ts-ignore
+    // positions_current[7] = 2
+    // // @ts-ignore
+    // positions_current[8] = 2
+
+    position.needsUpdate = true
+
+}
+
+async function fetchChunk(ahn: number, chunkId: string, level: number): Promise<Float32Array> {
+    const url = `${process.env.PUBLIC_URL}/chunks/ahn${ahn}/${chunkId}_${level}.json`
+    // console.log("fetching: " + url)
+    // const url = `${process.env.PUBLIC_URL}/chunks/0_0.json`
+    const res = await axios.get(url)
+    const positions = res.data.positions
+    return positions
+}
+
+// function positionToChunkId(x: number, z: number): string {
+//     const isXValid = x >= minX || x <= maxX
+//     const isZValid = z >= minZ || z <= maxZ
+//     if (!isXValid || !isZValid) {
+//         throw new Error(`Received invalid coordinates x=${x} valid? ${isXValid}, z=${z} valid? ${isZValid}`)
+//     }
+//     let level = 0
+//     // TODO implement some logic to set level based on z value
+//     const column = Math.floor((x / columnSize))
+//     const row = Math.floor((z / rowSize))
+//     const chunkId = createChunkId(column, row)
+//     return chunkId
+// }
+
+async function updateChunks(x: number, y: number, z: number): Promise<void> {
+    for (const id of metadata_ahn2.chunkIds) {
+        const chunkInfo = chunkInfoMapAHN2[id]
+        const calculatedLevel = calculateLevel(chunkInfo, x, y, z)
+        if (calculatedLevel !== chunkInfo.level) {
+            chunkInfo.level = calculatedLevel
+            toFetchAHN2.push(chunkInfo)
+        }
+    }
+    for (const id of metadata_ahn3.chunkIds) {
+        const chunkInfo = chunkInfoMapAHN3[id]
+        const calculatedLevel = calculateLevel(chunkInfo, x, y, z)
+        if (calculatedLevel !== chunkInfo.level) {
+            chunkInfo.level = calculatedLevel
+            toFetchAHN3.push(chunkInfo)
+        }
+    }
+}
+
+function calculateLevel(chunk: ChunkBufferInfo, x: number, y: number, z: number): number {
+    const level = 0  // TODO do some logic on y
+    return level
+}
+
+function createChunkId(column: number, row: number): string {
+    return `${(column * rows) + row}`
+}
+
+
+function createMesh(name?: string): [THREE.Mesh, THREE.LineSegments] {
+    if (typeof name !== 'undefined') {
+    }
+    const edges = new THREE.EdgesGeometry(geometryAHN3);
     const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({
-        color: shade(color, -0.5),
+        color: shade('#006994', -0.5),
         linewidth: 3,  // Due to limitations of the OpenGL Core Profile with the WebGL renderer on most platforms linewidth will always be 1 regardless of the set value.
     }));
-    return [mesh, line]
-}
-
-type RenderProps = {
-    isRenderingMesh1: boolean;
-}
-
-function Renderer(props: RenderProps) {
-    const rendererDivRef = useRef<HTMLDivElement>(null)
-    const [root, setRoot] = useState<THREE.Object3D | null>(null)
-
-    useEffect(() => {
-        const {root: rootScene, cleanup} = initScene(rendererDivRef)
-        setRoot(rootScene)
-        return () => {
-            cleanup()
-        }
-    }, [])
-    useEffect(() => {
-        if (root === null) {
-            return
-        }
-        const mesh1 = root.getObjectByName(mesh1Name)
-        if (typeof mesh1 === 'undefined') {
-            return
-        }
-        mesh1.visible = !mesh1.visible
-    }, [props.isRenderingMesh1])
-    return (
-        <div ref={rendererDivRef}>
-
-        </div>
-    )
+    return [meshAHN3, line]
 }
 
 export default Renderer
