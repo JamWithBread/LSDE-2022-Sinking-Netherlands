@@ -4,6 +4,7 @@ import sys
 import numpy as np
 import json
 import argparse
+import utils
 
 parser = argparse.ArgumentParser(description='Create mesh data data dump')
 parser.add_argument('-n', '--number', type=int, default=10)
@@ -20,23 +21,7 @@ geometry_type = 'random_sample'
 
 positions = [item.tolist() for sublist in coordinates for item in sublist]
 
-buffer_geometry = {
-    "metadata": {
-        "version": 4,
-        "type": "BufferGeometry"
-    },
-    "uuid": "AF2ADB07-FBC5-4BAE-AD60-123456789ABC",
-    "type": "BufferGeometry",
-    "data": {
-        "attributes": {
-            "position": {
-                "itemSize": 3,
-                "type": "Float32Array",
-                "array": positions
- }}}}
-
-filename = f'../frontend/public/mesh_data/random_triangles_{args.number}.json' \
+path = f'../frontend/public/mesh_data/random_triangles_{args.number}.json'
+utils.store_as_json(positions, path)
 
 
-with open(filename, 'w') as fp:
-    json.dump(buffer_geometry, fp)
