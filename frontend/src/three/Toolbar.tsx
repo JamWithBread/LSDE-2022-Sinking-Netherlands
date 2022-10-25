@@ -13,7 +13,7 @@ type ToolbarProps = {
 
 function Toolbar(props: ToolbarProps) {
     function handleSliderChange(e: React.ChangeEvent<HTMLInputElement>) {
-        props.setWaterHeight(parseFloat(e.target.value)/100)
+        props.setWaterHeight(parseFloat(e.target.value)/1000)
     }
     return (
         <div>
@@ -33,10 +33,27 @@ function Toolbar(props: ToolbarProps) {
                 </button>
             </div>
             <div className="slidecontainer">
-                <input type="range" min="0" max="100" className="slider" id="myRange"
+                <input type="range" min="0" max="100" className="slider"
                        value={props.waterHeight}
                        onChange={handleSliderChange}/>
             </div>
+            <div>
+                <p><code>W</code> Up</p>
+                <p><code>A</code> Left</p>
+                <p><code>S</code> Down</p>
+                <p><code>D</code> Right</p>
+                <p><code>Q</code> Rotate left</p>
+                <p><code>E</code> Rotate right</p>
+                <p><code>&#8593;</code> Zoom in</p>
+                <p><code>&#8595;</code> Zoom out</p>
+                <p><code>&#8592;</code> Tilt left</p>
+                <p><code>&#8594;</code> Tilt right</p>
+            </div>
+            <footer>
+                <p>GROUP 02</p>
+                <p>The Sinking Netherlands</p>
+
+            </footer>
         </div>
     )
 }
