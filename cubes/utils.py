@@ -22,7 +22,7 @@ def store_positions_as_json(positions, path):
 
 
 def read_json(path):
-    with open(path, 'w') as fp:
+    with open(path, 'r') as fp:
         json_str = fp.read()
         d = json.loads(json_str)
     return d
