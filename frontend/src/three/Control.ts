@@ -81,16 +81,16 @@ class FlyControls extends THREE.EventDispatcher {
             return;
         }
         switch (event.code) {
-            case 'ShiftLeft':
-            case 'ShiftRight':
-                this.movementSpeedMultiplier = .1;
-                break;
+            // case 'ShiftLeft':
+            // case 'ShiftRight':
+            //     this.movementSpeedMultiplier = .1;
+            //     break;
 
             case 'KeyW':
-                this.moveState.forward = 1;
+                this.moveState.up = 1;
                 break;
             case 'KeyS':
-                this.moveState.back = 1;
+                this.moveState.down = 1;
                 break;
 
             case 'KeyA':
@@ -99,19 +99,19 @@ class FlyControls extends THREE.EventDispatcher {
             case 'KeyD':
                 this.moveState.right = 1;
                 break;
-
-            case 'KeyR':
-                this.moveState.up = 1;
-                break;
-            case 'KeyF':
-                this.moveState.down = 1;
-                break;
+            //
+            // case 'KeyR':
+            //     this.moveState.up = 1;
+            //     break;
+            // case 'KeyF':
+            //     this.moveState.down = 1;
+            //     break;
 
             case 'ArrowUp':
-                this.moveState.pitchUp = 1;
+                this.moveState.forward = 1;
                 break;
             case 'ArrowDown':
-                this.moveState.pitchDown = 1;
+                this.moveState.back = 1;
                 break;
 
             case 'ArrowLeft':
@@ -141,10 +141,10 @@ class FlyControls extends THREE.EventDispatcher {
                 break;
 
             case 'KeyW':
-                this.moveState.forward = 0;
+                this.moveState.up = 0;
                 break;
             case 'KeyS':
-                this.moveState.back = 0;
+                this.moveState.down = 0;
                 break;
 
             case 'KeyA':
@@ -154,18 +154,18 @@ class FlyControls extends THREE.EventDispatcher {
                 this.moveState.right = 0;
                 break;
 
-            case 'KeyR':
-                this.moveState.up = 0;
-                break;
-            case 'KeyF':
-                this.moveState.down = 0;
-                break;
-
+            // case 'KeyR':
+            //     this.moveState.up = 0;
+            //     break;
+            // case 'KeyF':
+            //     this.moveState.down = 0;
+            //     break;
+            //
             case 'ArrowUp':
-                this.moveState.pitchUp = 0;
+                this.moveState.forward = 0;
                 break;
             case 'ArrowDown':
-                this.moveState.pitchDown = 0;
+                this.moveState.back = 0;
                 break;
 
             case 'ArrowLeft':
