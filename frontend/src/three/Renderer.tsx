@@ -3,14 +3,20 @@ import * as THREE from 'three'
 import {FlyControls} from './Control'
 import {shade} from "../utils/color"
 import axios from 'axios'
+import axiosRetry from 'axios-retry';
 import metadata_ahn3 from '../chunks/ahn3/_metadata.json'
 import metadata_ahn2 from '../chunks/ahn2/_metadata.json'
+import {MathUtils} from "three";
+
+axiosRetry(axios, {
+    retries: 10,
+    retryDelay: axiosRetry.exponentialDelay,
+})
+const nFetchPerFrame = 10  // we get errors when this number is high, but I am not a 100% sure if the retries help, they still occur but maybe less
 
 const cameraFOV = 50
 const cameraNear = 0.1
 const cameraFar = 1000
-
-const nFetchPerFrame = 10
 
 const minX = metadata_ahn3.minX
 const minZ = metadata_ahn3.minZ
@@ -19,8 +25,11 @@ const maxZ = metadata_ahn3.maxZ
 
 const columns = metadata_ahn3.columns
 const rows = metadata_ahn3.rows
+const levels = metadata_ahn3.levels
 const chunks = columns * rows
 
+const maxHeightNoZoom = 4.5
+const zoomDelta = maxHeightNoZoom / levels.length
 const columnSize = (maxX - minX) / columns
 const rowSize = (maxZ - minZ) / rows
 
@@ -29,8 +38,8 @@ const toFetchAHN2: ChunkBufferInfo[] = []
 
 type ChunkBufferInfo = {
     id: string,
-    // column: number,
-    // row: number,
+    x: number,
+    z: number,
     level: number,
     minBufferIdx: number,
 }
@@ -39,26 +48,65 @@ const MAX_TRIANGLES_PER_CHUNK = metadata_ahn3.maxTriangles
 const geometryAHN3 = new THREE.BufferGeometry()
 const geometryAHN2 = new THREE.BufferGeometry()
 const BUFFER_SIZE_PER_CHUNK = MAX_TRIANGLES_PER_CHUNK * 9
-const positionsAHN3 = new Float32Array(BUFFER_SIZE_PER_CHUNK * chunks); // 3 vertices per point
-const positionsAHN2 = new Float32Array(BUFFER_SIZE_PER_CHUNK * chunks); // 3 vertices per point
+const vertexLengthsAHN3 = metadata_ahn3.vertexLengths
+const vertexLengthsAHN2 = metadata_ahn2.vertexLengths
+const buffer_size_ahn3 = vertexLengthsAHN3.reduce((partialSum, a) => partialSum + a, 0)
+const buffer_size_ahn2 = vertexLengthsAHN2.reduce((partialSum, a) => partialSum + a, 0)
+const buffer_idxs_ahn3 = [0, ...vertexLengthsAHN3.map((elem, index) => vertexLengthsAHN3.slice(0,index + 1).reduce((a, b) => a + b))]
+const buffer_idxs_ahn2 = [0, ...vertexLengthsAHN2.map((elem, index) => vertexLengthsAHN2.slice(0,index + 1).reduce((a, b) => a + b))]
 
-function createChunkInfoMap(chunkIds: string[]): { [k: string]: ChunkBufferInfo } {
-    const chunkInfoMap: { [k: string]: ChunkBufferInfo } = {}
+const positionsAHN3 = new Float32Array(buffer_size_ahn3)
+const positionsAHN2 = new Float32Array(buffer_size_ahn2)
+
+type ChunkInfoMap = {
+    [k: string]: ChunkBufferInfo
+}
+type levelChunkIdMap = {
+    [l: string]: string[]
+}
+
+function createChunkInfoMap(chunkIds: string[], buffer_idxs: number[]): ChunkInfoMap {
+    const chunkInfoMap: ChunkInfoMap = {}
     let counter = 0
-    for (const id of chunkIds) {
+    for (let i = 0; i < chunkIds.length; i++) {
         const level = -1
+        const id = chunkIds[i]
+        const z = (((parseInt(id) % rows) - columns / 2) * columnSize)
+        const x = (Math.floor((parseInt(id) / columns) - rows / 2) * rowSize)-1
         chunkInfoMap[id] = {
             id: id,
             level: level,
-            minBufferIdx: counter * BUFFER_SIZE_PER_CHUNK,
+            z: z,
+            x: x,
+            minBufferIdx: buffer_idxs[i],
         }
         counter++
     }
     return chunkInfoMap
 }
 
-const chunkInfoMapAHN3 = createChunkInfoMap(metadata_ahn3.chunkIds)
-const chunkInfoMapAHN2 = createChunkInfoMap(metadata_ahn2.chunkIds)
+const chunkInfoMapAHN3 = createChunkInfoMap(metadata_ahn3.chunkIds.combined, buffer_idxs_ahn3)
+const chunkInfoMapAHN2 = createChunkInfoMap(metadata_ahn2.chunkIds.combined, buffer_idxs_ahn2)
+
+type ChunkIds = {
+    combined: string[],
+    "0": string[],
+    [l: string]: string[]
+}
+
+function createLevelChunkIdMap(chunkIds: ChunkIds): levelChunkIdMap {
+    let levelChunkIdMap: levelChunkIdMap = {}
+    for (const level of levels) {
+        const levelStr = level.toString()
+        if (Object.keys(chunkIds).includes(levelStr)) {
+            levelChunkIdMap[levelStr] = chunkIds[levelStr]
+        }
+    }
+    return levelChunkIdMap
+}
+
+const levelChunkIdMapAHN3 = createLevelChunkIdMap(metadata_ahn3.chunkIds)
+const levelChunkIdMapAHN2 = createLevelChunkIdMap(metadata_ahn2.chunkIds)
 
 geometryAHN3.setAttribute('position', new THREE.BufferAttribute(positionsAHN3, 3));
 geometryAHN2.setAttribute('position', new THREE.BufferAttribute(positionsAHN2, 3));
@@ -79,7 +127,7 @@ const fragmentShader = `
             varying vec3 positionVertex;
 
             void main() {
-                gl_FragColor = vec4(mix(color1, color2, pow(positionVertex.y, 0.4)), 1.0);
+                gl_FragColor = vec4(mix(color1, color2, pow(positionVertex.y, 0.2)), 1.0);
             }
         `
 
@@ -89,7 +137,7 @@ const materialAHN3 = new THREE.ShaderMaterial({
             value: new THREE.Color(0x5800FF),
         },
         color2: {
-            value: new THREE.Color(0x00D7FF)
+            value: new THREE.Color(0x72FFFF)
         }
     },
     vertexShader: vertexShader,
@@ -103,7 +151,7 @@ const materialAHN2 = new THREE.ShaderMaterial({
             value: new THREE.Color(0xFF00E4),
         },
         color2: {
-            value: new THREE.Color(0xFDB9FC)
+            value: new THREE.Color(0xFFEDED)
         }
     },
     vertexShader: vertexShader,
@@ -265,7 +313,20 @@ function initScene(ref: React.RefObject<HTMLElement>): { trackedObjects: Tracked
 
     scene.add(waterMesh)
 
-    camera.position.z = 5
+    camera.position.y = 5
+    camera.lookAt(0, 0, 0)
+    camera.rotateZ(MathUtils.degToRad(180))
+
+    // camera.position.y = 5
+
+    window.onresize = function () {
+
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+
+        renderer.setSize( window.innerWidth, window.innerHeight );
+
+    };
 
     function animate() {
         updateChunks(camera.position.x, camera.position.y, camera.position.z)
@@ -353,24 +414,6 @@ function updateChunk(ahn: number, chunkInfo: ChunkBufferInfo, positions_chunk: F
         // @ts-ignore
         positions_current[i] = 0
     }
-    // // @ts-ignore
-    // positions_current[0] = 3
-    // // @ts-ignore
-    // positions_current[1] = 3
-    // // @ts-ignore
-    // positions_current[2] = 3
-    // // @ts-ignore
-    // positions_current[3] = 2
-    // // @ts-ignore
-    // positions_current[4] = 3
-    // // @ts-ignore
-    // positions_current[5] = 2
-    // // @ts-ignore
-    // positions_current[6] = 2
-    // // @ts-ignore
-    // positions_current[7] = 2
-    // // @ts-ignore
-    // positions_current[8] = 2
 
     position.needsUpdate = true
 
@@ -378,40 +421,24 @@ function updateChunk(ahn: number, chunkInfo: ChunkBufferInfo, positions_chunk: F
 
 async function fetchChunk(ahn: number, chunkId: string, level: number): Promise<Float32Array> {
     const url = `${process.env.PUBLIC_URL}/chunks/ahn${ahn}/${chunkId}_${level}.json`
-    // console.log("fetching: " + url)
-    // const url = `${process.env.PUBLIC_URL}/chunks/0_0.json`
     const res = await axios.get(url)
     const positions = res.data.positions
     return positions
 }
 
-// function positionToChunkId(x: number, z: number): string {
-//     const isXValid = x >= minX || x <= maxX
-//     const isZValid = z >= minZ || z <= maxZ
-//     if (!isXValid || !isZValid) {
-//         throw new Error(`Received invalid coordinates x=${x} valid? ${isXValid}, z=${z} valid? ${isZValid}`)
-//     }
-//     let level = 0
-//     // TODO implement some logic to set level based on z value
-//     const column = Math.floor((x / columnSize))
-//     const row = Math.floor((z / rowSize))
-//     const chunkId = createChunkId(column, row)
-//     return chunkId
-// }
-
 async function updateChunks(x: number, y: number, z: number): Promise<void> {
-    for (const id of metadata_ahn2.chunkIds) {
+    for (const id of metadata_ahn2.chunkIds.combined) {
         const chunkInfo = chunkInfoMapAHN2[id]
         const calculatedLevel = calculateLevel(chunkInfo, x, y, z)
-        if (calculatedLevel !== chunkInfo.level) {
+        if (calculatedLevel !== chunkInfo.level && levelChunkIdMapAHN2[calculatedLevel].includes(id)) {
             chunkInfo.level = calculatedLevel
             toFetchAHN2.push(chunkInfo)
         }
     }
-    for (const id of metadata_ahn3.chunkIds) {
+    for (const id of metadata_ahn3.chunkIds.combined) {
         const chunkInfo = chunkInfoMapAHN3[id]
         const calculatedLevel = calculateLevel(chunkInfo, x, y, z)
-        if (calculatedLevel !== chunkInfo.level) {
+        if (calculatedLevel !== chunkInfo.level && levelChunkIdMapAHN3[calculatedLevel].includes(id)) {
             chunkInfo.level = calculatedLevel
             toFetchAHN3.push(chunkInfo)
         }
@@ -419,14 +446,26 @@ async function updateChunks(x: number, y: number, z: number): Promise<void> {
 }
 
 function calculateLevel(chunk: ChunkBufferInfo, x: number, y: number, z: number): number {
-    const level = 0  // TODO do some logic on y
-    return level
+    const x_dist = Math.abs(chunk.x - x)
+    const z_dist = Math.abs(chunk.z - z)
+    const dist = x_dist + z_dist
+    for (let i = 0; i < levels.length-1; i++) {
+        if ((dist < 1.0) && y < ((i + 1) * zoomDelta)) { // i would say the dist needs to be flipped but then the behaviour is wrong?
+            return levels[i]
+        }
+    }
+    for (let i = 0; i < levels.length-2; i++) {
+        if ((dist < 2.0) && y < ((i + 1) * zoomDelta)) { // i would say the dist needs to be flipped but then the behaviour is wrong?
+            return levels[i+1]
+        }
+    }
+    // for (let i = 0; i < levels.length-1; i++) {
+    //     if ((dist < 1.5) && y < ((i + 1) * zoomDelta)) { // i would say the dist needs to be flipped but then the behaviour is wrong?
+    //         return levels[i]
+    //     }
+    // }
+    return levels[levels.length-1]
 }
-
-function createChunkId(column: number, row: number): string {
-    return `${(column * rows) + row}`
-}
-
 
 function createMesh(name?: string): [THREE.Mesh, THREE.LineSegments] {
     if (typeof name !== 'undefined') {
