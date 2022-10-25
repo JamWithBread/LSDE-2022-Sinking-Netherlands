@@ -54,17 +54,17 @@ def normalize_point(point, bbox, is_flipping=True):
     if is_flipping:
         flip = -1  # the -1 is to flip the image on the north axis, it's more natural for three js
 
-    px, pz = point[0], point[1]
+    px, pz = point[0], point[2]
     px = (px - x_norm) * flip
     pz = (pz - z_norm) * flip
-    return px, pz
+    return px, point[1], pz
 
 
 def create_cube(point, column_delta, row_delta):
     half_column_delta = column_delta / 2
     half_row_delta = row_delta / 2
     x_start = point[0] - half_column_delta
-    y_start = 0.001
+    y_start = 0
     z_start = point[2] - half_row_delta
     x_end = point[0] + half_column_delta
     y_end = point[1]
