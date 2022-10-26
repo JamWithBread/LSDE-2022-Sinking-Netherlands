@@ -5,10 +5,8 @@ LSDE Assignment 2, Group02
 - Reinier & Jeren
   - Line 56 in cubes.py is what functionally needs to be replaced by the result of our gridding/tiling
 - Kailhan
-    - Update cubes.py to create different granularities, this is a bit dependent on the gridding/tiling but I can use the perlin noise as is for testing
-    - Fetch different granularity level chunks based on distance
+    - Figure out if we can have different granularities than "0" and "3" atm
 - Other stuff
-  - Make the UI look better and update on resize
   - Tweak scaling
   - Tweak rendering performance parameters e.g. how many chunks to fetch/distance
 
