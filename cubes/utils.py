@@ -46,17 +46,13 @@ def normalize_bbox(bbox):
     return bbox_normalized
 
 
-def normalize_point(point, bbox, is_flipping=True):
+def normalize_point(point, bbox):
     x_norm = (bbox[0] + bbox[2]) / 2
     z_norm = (bbox[1] + bbox[3]) / 2
 
-    flip = 1
-    if is_flipping:
-        flip = -1  # the -1 is to flip the image on the north axis, it's more natural for three js
-
     px, pz = point[0], point[2]
-    px = (px - x_norm) * flip
-    pz = (pz - z_norm) * flip
+    px = (px - x_norm)
+    pz = (pz - z_norm)
     return px, point[1], pz
 
 

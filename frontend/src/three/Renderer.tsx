@@ -12,9 +12,9 @@ axiosRetry(axios, {
     retries: 10,
     retryDelay: axiosRetry.exponentialDelay,
 })
-const nFetchPerFrame = 10  // we get errors when this number is high, but I am not a 100% sure if the retries help, they still occur but maybe less
+const nFetchPerFrame = 100  // we get errors when this number is high, but I am not a 100% sure if the retries help, they still occur but maybe less
 
-const cameraFOV = 50
+const cameraFOV = 10
 const cameraNear = 0.1
 const cameraFar = 1000
 
@@ -28,7 +28,7 @@ const rows = metadata_ahn3.rows
 const levels = metadata_ahn3.levels
 const chunks = columns * rows
 
-const maxHeightNoZoom = 4.5
+const maxHeightNoZoom = 12
 const zoomDelta = maxHeightNoZoom / levels.length
 const columnSize = (maxX - minX) / columns
 const rowSize = (maxZ - minZ) / rows
@@ -71,8 +71,14 @@ function createChunkInfoMap(chunkIds: string[], buffer_idxs: number[]): ChunkInf
     for (let i = 0; i < chunkIds.length; i++) {
         const level = -1
         const id = chunkIds[i]
-        const z = (((parseInt(id) % rows) - columns / 2) * columnSize)
-        const x = (Math.floor((parseInt(id) / columns) - rows / 2) * rowSize)-1
+        const idInt = parseInt(id)
+        const column = idInt % rows
+        const row = Math.floor(idInt /columns)
+        let x = ((row/rows)-0.5)*((maxX - minX)/2)
+        let z = ((column/columns)-0.5)*((maxZ - minZ)/2)
+        x =  x < 0 ? (-Math.sqrt(-x)) : Math.sqrt(x)
+        z =  z < 0 ? (-Math.sqrt(-z)) : Math.sqrt(z)
+
         chunkInfoMap[id] = {
             id: id,
             level: level,
@@ -313,7 +319,7 @@ function initScene(ref: React.RefObject<HTMLElement>): { trackedObjects: Tracked
 
     scene.add(waterMesh)
 
-    camera.position.y = 5
+    camera.position.y = 15
     camera.lookAt(0, 0, 0)
     camera.rotateZ(MathUtils.degToRad(180))
 
@@ -446,16 +452,16 @@ async function updateChunks(x: number, y: number, z: number): Promise<void> {
 }
 
 function calculateLevel(chunk: ChunkBufferInfo, x: number, y: number, z: number): number {
-    const x_dist = Math.abs(chunk.x - x)
-    const z_dist = Math.abs(chunk.z - z)
-    const dist = x_dist + z_dist
+    const x_dist = Math.pow(chunk.x - x, 2)
+    const z_dist = Math.pow(chunk.z - z, 2)
+    const dist = (x_dist + z_dist)*4
     for (let i = 0; i < levels.length-1; i++) {
-        if ((dist < 1.0) && y < ((i + 1) * zoomDelta)) { // i would say the dist needs to be flipped but then the behaviour is wrong?
+        if ((dist < 0.5) && y < ((i + 2) * zoomDelta)) { // i would say the dist needs to be flipped but then the behaviour is wrong?
             return levels[i]
         }
     }
     for (let i = 0; i < levels.length-2; i++) {
-        if ((dist < 2.0) && y < ((i + 1) * zoomDelta)) { // i would say the dist needs to be flipped but then the behaviour is wrong?
+        if ((dist < 2.5) && y < ((i + 3) * zoomDelta)) { // i would say the dist needs to be flipped but then the behaviour is wrong?
             return levels[i+1]
         }
     }
