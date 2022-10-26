@@ -4,6 +4,7 @@ import argparse
 import random
 import math
 import statistics
+import pandas as pd
 
 import shapefile
 import shapely
@@ -15,27 +16,54 @@ import utils
 parser = argparse.ArgumentParser(description='Create mesh data data dump')
 parser.add_argument('-a', '--ahn', type=int, choices=[2, 3])
 parser.add_argument('-c', '--maxColumns', type=int, help="number of columns of grid on highest granularity",
-                    default=512)
-parser.add_argument('-r', '--maxRows', type=int, help="number of rows of grid on highest granularity", default=512)
-parser.add_argument('-l', '--levels', type=int, help="number of granularity levels (these might need to be even powers of 4 but this might also just be a bug in the code:)", default=4)
+                    default=1024)
+parser.add_argument('-r', '--maxRows', type=int, help="number of rows of grid on highest granularity", default=1024)
+# parser.add_argument('-l', '--levels', type=int, help="number of granularity levels (these might need to be even powers of 4 but this might also just be a bug in the code:)", default=4)
 args = parser.parse_args()
 
-levels = [level for level in range(args.levels)]
 
-sf = shapefile.Reader("./WB_countries_Admin0_10m/WB_countries_Admin0_10m.shp")
-shapeRecordNL = [sr for sr in sf.shapeRecords() if 'Netherlands' in sr.record[4]][-1]
+def run(maxColumns, maxRows, ahn):
+    levels = [0, 3]  # I think these need to be of the form (2^x)-1 to not have weird gaps in certain levels we need a
+    # lot of columns and rows for level 15 tho
+    sf = shapefile.Reader("./WB_countries_Admin0_10m/WB_countries_Admin0_10m.shp")
+    shapeRecordNL = [sr for sr in sf.shapeRecords() if 'Netherlands' in sr.record[4]][-1]
 
-points = shapeRecordNL.shape.points
-parts = shapeRecordNL.shape.parts
-bbox = shapeRecordNL.shape.bbox
-n_parts = len(parts)
-n_points = len(points)
+    points = shapeRecordNL.shape.points
+    parts = shapeRecordNL.shape.parts
+    bbox = shapeRecordNL.shape.bbox
+    # bbox = [
+    #     268,
+    #     6134,
+    #     5569,
+    #     12308
+    # ]
 
-bbox_normalized = utils.normalize_bbox(bbox)
-polygons = utils.create_polygons(points, parts)
+    polygons = utils.create_polygons(points, parts)
+    magic_value = -0.0891273
+    base_path = "../frontend"
+    # base_path = "/dbfs/mnt/lsde/group02"
+    create_heightmap_cubes(polygons, args.maxColumns, args.maxRows, levels, bbox, args.ahn, base_path, magic_value)
 
 
-def create_heightmap_cubes(polygons, columns, rows):
+def get_height(p, df, magic_value=-0.0891273):
+    m1 = df['x_grid'] == p[0]
+    m2 = df['y_grid'] == p[1]
+    if df[m1 & m2]['z'].empty:
+        return [p[0], magic_value, p[1]]
+
+    return [p[0], df[m1 & m2]['z'].values[0], p[1]]
+
+
+# def get_batch(points, df):
+#     res = []
+#     for p in points:
+#         res.append(get_height(p, df))
+#     return res
+def create_heightmap_cubes(polygons, columns, rows, levels, bbox, ahn, base_path, magic_value):
+    max_to_group = 4 ** levels[-1]
+    assert (columns * rows) / max_to_group >= 1
+
+    bbox_normalized = utils.normalize_bbox(bbox)
     is_contained = lambda point: any([p.contains(shapely.geometry.Point(point)) for p in polygons])
     column_delta_unnormalized = (bbox[2] - bbox[0]) / columns
     row_delta_unnormalized = (bbox[3] - bbox[1]) / rows
@@ -48,7 +76,15 @@ def create_heightmap_cubes(polygons, columns, rows):
         for x in range(columns) for z in range(rows)
     ]
 
+    # chunck_size = 2048
+    # rdd = sc.parallelize([grid_points_0[i:i + chunck_size] for i in range(0, len(grid_points_0), chunck_size)])
+    # grid_points_0 = rdd.flatMap((partial(get_batch, df=df))).collect()
+    #
+    #
     noise = PerlinNoise(octaves=1, seed=random.randint(0, 9999))
+
+    #     rdd = sc.parallelize(grid_points_0)
+    #     grid_points_0 = rdd.map((partial(get_height, df=df))).collect()
 
     grid_points_0 = [
         (
@@ -76,20 +112,14 @@ def create_heightmap_cubes(polygons, columns, rows):
     #     vertices_lengths.append(len(cubes_flat))
     #     cubes.append(cubes_flat)
 
-    utils.delete_all_json(f'../frontend/public/chunks/ahn{args.ahn}/')
+    utils.delete_all_json(f'{base_path}/public/chunks/ahn{ahn}/')
 
     xs = []
     ys = []
     zs = []
-    max_to_group = 2 ** args.levels
-    # max_to_group = 1
-    # print(f"{grid_points_0 =}")
-    assert len(grid_points_0) % max_to_group == 0
-    # the * int(math.pow(max_to_group, 0.5))) - (32 * args.levels) part here is unnessary as far as I can understand
-    # we seeminly get the whole of the netherlands if we do add it though instead of just the bottom right
-    n_chunks = int(len(grid_points_0) / max_to_group * int(math.pow(max_to_group, 0.5))) - (32 * args.levels)
     n_chunks = int(len(grid_points_0) / max_to_group)
 
+    positions = []
     start = 0
     side_length = int(math.pow(max_to_group, 0.5))
     # side_length = max_to_group
@@ -110,26 +140,48 @@ def create_heightmap_cubes(polygons, columns, rows):
             start += (side_length - 1) * columns
         else:
             start += side_length
-
+        # for level in levels:
+        #     step = int(math.pow(4, level))
+        #     # print(f"{step =}")
+        #     points_level = []
+        #     for foo in range(0, len(point_group), step):
+        #         current_points = point_group[foo:foo + step]
+        #         points_level.append((
+        #             statistics.mean(
+        #                 [p[0] for p in current_points]
+        #             ),
+        #             statistics.mean(
+        #                 [p[1] for p in current_points]
+        #             ),
+        #             statistics.mean(
+        #                 [p[2] for p in current_points]
+        #             ),
+        #         ))
+        #     points_level = [p for p in points_level if is_contained((p[0], p[2]))]
+        #     points_level = [utils.normalize_point(p, bbox) for p in points_level]
+        #     if len(points_level) == 0:
         for level in levels:
             step = int(math.pow(4, level))
             # print(f"{step =}")
             points_level = []
+            point_group = [p if is_contained((p[0], p[2])) else (0, magic_value, 0) for p in
+                           point_group]
             for foo in range(0, len(point_group), step):
                 current_points = point_group[foo:foo + step]
+                if all([p[1] == magic_value for p in current_points]):
+                    continue
                 points_level.append((
                     statistics.mean(
-                        [p[0] for p in current_points]
+                        [p[0] for p in current_points if p[1] != magic_value]
                     ),
                     statistics.mean(
-                        [p[1] for p in current_points]
+                        [p[1] for p in current_points if p[1] != magic_value]
                     ),
                     statistics.mean(
-                        [p[2] for p in current_points]
+                        [p[2] for p in current_points if p[1] != magic_value]
                     ),
                 ))
-            points_level = [p for p in points_level if is_contained((p[0], p[2]))]
-            points_level = [utils.normalize_point(p, bbox, is_flipping=False) for p in points_level]
+            points_level = [utils.normalize_point(p, bbox) for p in points_level]
             if len(points_level) == 0:
                 # print(f"Did not find points for chunk: {chunk_id}")
                 continue
@@ -145,7 +197,11 @@ def create_heightmap_cubes(polygons, columns, rows):
                 vertices_lengths.append(len(cubes_level))
                 cubes.append(cubes_level)
             ids[level].append(chunk_id)
-            path = f'../frontend/public/chunks/ahn{args.ahn}/{chunk_id}_{level}.json'
+            path = f'{base_path}/public/chunks/ahn{ahn}/{chunk_id}_{level}.json'
+            positions.append({
+                "path": f"ahn{ahn}/{chunk_id}_{level}.json",
+                "positions": cubes_level,
+            })
             utils.store_positions_as_json(cubes_level, path)
     # for i in range(stop=len(grid_points_0), step=4):
 
@@ -182,10 +238,12 @@ def create_heightmap_cubes(polygons, columns, rows):
         "columns": columns,
         "rows": rows,
     }
+    # df_positions = pd.DataFrame.from_records(positions)
+    # df_positions.to_parquet(f"{base_path}/public/chunks/ahn{ahn}/positions.gzip", compression='gzip')
 
-    with open(f'../frontend/src/chunks/ahn{args.ahn}/_metadata.json', 'w') as fp:
-        print(f"dumped to ../frontend/src/chunks/ahn{args.ahn}/_metadata.json")
+    with open(f'{base_path}/src/chunks/ahn{ahn}/_metadata.json', 'w') as fp:
+        print(f"dumped to {base_path}/src/chunks/ahn{ahn}/_metadata.json")
         json.dump(metadata, fp)
 
 
-create_heightmap_cubes(polygons, args.maxColumns, args.maxRows)
+run(args.maxColumns, args.maxRows, args.ahn)
