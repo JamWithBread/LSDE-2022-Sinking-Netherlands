@@ -11,13 +11,13 @@ LSDE Assignment 2, Group02
   - Tweak rendering performance parameters e.g. how many chunks to fetch/distance
 
 ## To Run
+- Run the `### THIS CELL !!! ###` in Combining grid files notebook, afterwards:
 - Go to the cubes folder and:
 ```shell
-chmod +x cubes.py
-./cubes.py -a 2
-./cubes.py -a 3
+chmod +x yank.py
+./yank.py
 ```
-This will generate simple chunks for ahn2 and ahn3
+This will generate chunks based on the heightmap for ahn2 and ahn3
 - Go to the frontend folder and:
 ```shell
 npm i
