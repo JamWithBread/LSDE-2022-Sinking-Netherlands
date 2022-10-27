@@ -14,14 +14,15 @@ axiosRetry(axios, {
 })
 const nFetchPerFrame = 100  // we get errors when this number is high, but I am not a 100% sure if the retries help, they still occur but maybe less
 
-const cameraFOV = 10
+const cameraFOV = 100
 const cameraNear = 0.1
-const cameraFar = 1000
+const cameraFar = 10000
 
 const minX = metadata_ahn3.minX
 const minZ = metadata_ahn3.minZ
 const maxX = metadata_ahn3.maxX
 const maxZ = metadata_ahn3.maxZ
+const maxY = metadata_ahn3.maxY
 
 const columns = metadata_ahn3.columns
 const rows = metadata_ahn3.rows
@@ -164,7 +165,7 @@ const materialAHN2 = new THREE.ShaderMaterial({
     fragmentShader: fragmentShader,
     side: THREE.DoubleSide
 })
-// const material = new THREE.MeshPhongMaterial({
+// const materialAHN2 = new THREE.MeshPhongMaterial({
 //     color: 0xFF0000,    // red (can also use a CSS color string here)
 //     flatShading: true,
 // });
@@ -321,7 +322,7 @@ function initScene(ref: React.RefObject<HTMLElement>): { trackedObjects: Tracked
 
     scene.add(waterMesh)
 
-    camera.position.y = 15
+    camera.position.y = maxY * 10
     camera.lookAt(0, 0, 0)
     camera.rotateZ(MathUtils.degToRad(180))
 
@@ -457,6 +458,7 @@ function calculateLevel(chunk: ChunkBufferInfo, x: number, y: number, z: number)
     const x_dist = Math.pow(chunk.x - x, 2)
     const z_dist = Math.pow(chunk.z - z, 2)
     const dist = (x_dist + z_dist)*4
+    return 0
     for (let i = 0; i < levels.length-1; i++) {
         if ((dist < 0.5) && y < ((i + 2) * zoomDelta)) { // i would say the dist needs to be flipped but then the behaviour is wrong?
             return levels[i]
