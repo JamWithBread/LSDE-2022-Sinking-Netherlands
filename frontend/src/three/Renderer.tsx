@@ -133,7 +133,7 @@ const fragmentShader = `
             varying vec3 positionVertex;
 
             void main() {
-                gl_FragColor = vec4(mix(color1, color2, pow(positionVertex.y, 0.2)), 1.0);
+                gl_FragColor = vec4(mix(color1, color2, pow(positionVertex.y/${maxY}, 0.3)), 1.0);
             }
         `
 
