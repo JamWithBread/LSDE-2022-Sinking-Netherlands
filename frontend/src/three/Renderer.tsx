@@ -324,6 +324,8 @@ function initScene(ref: React.RefObject<HTMLElement>): { trackedObjects: Tracked
 
     camera.position.y = maxY * 10
     camera.lookAt(0, 0, 0)
+    camera.rotateZ(MathUtils.degToRad(180))
+
 
     window.onresize = function () {
 
