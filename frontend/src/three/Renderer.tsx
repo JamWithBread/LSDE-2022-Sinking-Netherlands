@@ -171,10 +171,12 @@ const materialAHN2 = new THREE.ShaderMaterial({
 
 const meshAHN3 = new THREE.Mesh(geometryAHN3, materialAHN3)
 const meshAHN3Name = "mesh_ahn3"
+meshAHN3.frustumCulled = false
 meshAHN3.name = meshAHN3Name
 
 const meshAHN2 = new THREE.Mesh(geometryAHN2, materialAHN2)
 const meshAHN2Name = "mesh_ahn2"
+meshAHN2.frustumCulled = false
 meshAHN2.name = meshAHN2Name
 
 
