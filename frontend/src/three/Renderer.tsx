@@ -20,19 +20,20 @@ const cameraFar = 10000
 
 const minX = metadata_ahn3.minX
 const minZ = metadata_ahn3.minZ
+const minY = metadata_ahn3.minY
 const maxX = metadata_ahn3.maxX
 const maxZ = metadata_ahn3.maxZ
 const maxY = metadata_ahn3.maxY
+const xRange = maxX - minX
+const zRange = maxZ - minZ
+const yRange = maxY - minY
 
 const columns = metadata_ahn3.columns
 const rows = metadata_ahn3.rows
 const levels = metadata_ahn3.levels
-const chunks = columns * rows
 
 const maxHeightNoZoom = 12
 const zoomDelta = maxHeightNoZoom / levels.length
-const columnSize = (maxX - minX) / columns
-const rowSize = (maxZ - minZ) / rows
 
 const toFetchAHN3: ChunkBufferInfo[] = []
 const toFetchAHN2: ChunkBufferInfo[] = []
@@ -43,18 +44,17 @@ type ChunkBufferInfo = {
     z: number,
     level: number,
     minBufferIdx: number,
+    length: number,
 }
 
-const MAX_TRIANGLES_PER_CHUNK = metadata_ahn3.maxTriangles
 const geometryAHN3 = new THREE.BufferGeometry()
 const geometryAHN2 = new THREE.BufferGeometry()
-const BUFFER_SIZE_PER_CHUNK = MAX_TRIANGLES_PER_CHUNK * 9
 const vertexLengthsAHN3 = metadata_ahn3.vertexLengths
 const vertexLengthsAHN2 = metadata_ahn2.vertexLengths
 const buffer_size_ahn3 = vertexLengthsAHN3.reduce((partialSum, a) => partialSum + a, 0)
 const buffer_size_ahn2 = vertexLengthsAHN2.reduce((partialSum, a) => partialSum + a, 0)
-const buffer_idxs_ahn3 = [0, ...vertexLengthsAHN3.map((elem, index) => vertexLengthsAHN3.slice(0,index + 1).reduce((a, b) => a + b))]
-const buffer_idxs_ahn2 = [0, ...vertexLengthsAHN2.map((elem, index) => vertexLengthsAHN2.slice(0,index + 1).reduce((a, b) => a + b))]
+const buffer_idxs_ahn3 = [0, ...vertexLengthsAHN3.map((elem, index) => vertexLengthsAHN3.slice(0, index + 1).reduce((a, b) => a + b))]
+const buffer_idxs_ahn2 = [0, ...vertexLengthsAHN2.map((elem, index) => vertexLengthsAHN2.slice(0, index + 1).reduce((a, b) => a + b))]
 
 const positionsAHN3 = new Float32Array(buffer_size_ahn3)
 const positionsAHN2 = new Float32Array(buffer_size_ahn2)
@@ -74,18 +74,17 @@ function createChunkInfoMap(chunkIds: string[], buffer_idxs: number[]): ChunkInf
         const id = chunkIds[i]
         const idInt = parseInt(id)
         const column = idInt % rows
-        const row = Math.floor(idInt /columns)
-        let x = ((row/rows)-0.5)*((maxX - minX)/2)
-        let z = ((column/columns)-0.5)*((maxZ - minZ)/2)
-        x =  x < 0 ? (-Math.sqrt(-x)) : Math.sqrt(x)
-        z =  z < 0 ? (-Math.sqrt(-z)) : Math.sqrt(z)
+        const row = Math.floor(idInt / columns)
+        let x = ((row / rows) - 0.5) * (xRange)
+        let z = ((column / columns) - 0.5) * (zRange)
 
         chunkInfoMap[id] = {
             id: id,
             level: level,
             z: z,
-            x: x,
+            x: -x,
             minBufferIdx: buffer_idxs[i],
+            length: buffer_idxs[i + 1] - buffer_idxs[i],
         }
         counter++
     }
@@ -179,7 +178,6 @@ const meshAHN2 = new THREE.Mesh(geometryAHN2, materialAHN2)
 const meshAHN2Name = "mesh_ahn2"
 meshAHN2.frustumCulled = false
 meshAHN2.name = meshAHN2Name
-
 
 const waterGeometry = new THREE.BufferGeometry();
 // create a simple square shape. We duplicate the top left and bottom right
@@ -333,7 +331,7 @@ function initScene(ref: React.RefObject<HTMLElement>): { trackedObjects: Tracked
         camera.aspect = window.innerWidth / window.innerHeight;
         camera.updateProjectionMatrix();
 
-        renderer.setSize( window.innerWidth, window.innerHeight );
+        renderer.setSize(window.innerWidth, window.innerHeight);
 
     };
 
@@ -409,7 +407,7 @@ function updateChunk(ahn: number, chunkInfo: ChunkBufferInfo, positions_chunk: F
 
     const start = chunkInfo.minBufferIdx
     const endOfPositions = chunkInfo.minBufferIdx + positions_chunk.length
-    const end = chunkInfo.minBufferIdx + BUFFER_SIZE_PER_CHUNK
+    const end = chunkInfo.minBufferIdx + chunkInfo.length
     if (start % 9 !== 0) {
         console.error("start should be divisible by 9: " + start)
         return
@@ -423,7 +421,6 @@ function updateChunk(ahn: number, chunkInfo: ChunkBufferInfo, positions_chunk: F
         // @ts-ignore
         positions_current[i] = 0
     }
-
     position.needsUpdate = true
 
 }
@@ -457,24 +454,23 @@ async function updateChunks(x: number, y: number, z: number): Promise<void> {
 function calculateLevel(chunk: ChunkBufferInfo, x: number, y: number, z: number): number {
     const x_dist = Math.pow(chunk.x - x, 2)
     const z_dist = Math.pow(chunk.z - z, 2)
-    const dist = (x_dist + z_dist)*4
-    return 0
-    for (let i = 0; i < levels.length-1; i++) {
-        if ((dist < 0.5) && y < ((i + 2) * zoomDelta)) { // i would say the dist needs to be flipped but then the behaviour is wrong?
+    const dist = (x_dist + z_dist)
+    for (let i = 0; i < levels.length - 1; i++) {
+        if ((dist < (zRange + xRange) * 16) && y < maxY * 8) {
             return levels[i]
         }
     }
-    for (let i = 0; i < levels.length-2; i++) {
-        if ((dist < 2.5) && y < ((i + 3) * zoomDelta)) { // i would say the dist needs to be flipped but then the behaviour is wrong?
-            return levels[i+1]
-        }
-    }
+    // for (let i = 0; i < levels.length-2; i++) {
+    //     if ((dist < 2.5) && y < ((i + 3) * zoomDelta)) { // i would say the dist needs to be flipped but then the behaviour is wrong?
+    //         return levels[i+1]
+    //     }
+    // }
     // for (let i = 0; i < levels.length-1; i++) {
     //     if ((dist < 1.5) && y < ((i + 1) * zoomDelta)) { // i would say the dist needs to be flipped but then the behaviour is wrong?
     //         return levels[i]
     //     }
     // }
-    return levels[levels.length-1]
+    return levels[levels.length - 1]
 }
 
 function createMesh(name?: string): [THREE.Mesh, THREE.LineSegments] {
