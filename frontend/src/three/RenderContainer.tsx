@@ -5,8 +5,8 @@ import Toolbar from "./Toolbar";
 import {useState} from "react";
 
 function RenderContainer() {
-    const [isRenderingMeshAHN3, setRenderingMeshAHN3] = useState(false)
-    const [isRenderingMeshAHN2, setRenderingMeshAHN2] = useState(false)
+    const [isRenderingMeshAHN3, setRenderingMeshAHN3] = useState(true)
+    const [isRenderingMeshAHN2, setRenderingMeshAHN2] = useState(true)
     const [isRenderingWater, setRenderingWater] = useState(false)
     const [waterHeight, setWaterHeight] = useState(0.0)
 

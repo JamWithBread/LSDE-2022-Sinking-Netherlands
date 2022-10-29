@@ -12,7 +12,7 @@ axiosRetry(axios, {
     retries: 10,
     retryDelay: axiosRetry.exponentialDelay,
 })
-const nFetchPerFrame = 100  // we get errors when this number is high, but I am not a 100% sure if the retries help, they still occur but maybe less
+const nFetchPerFrame = 10  // we get errors when this number is high, but I am not a 100% sure if the retries help, they still occur but maybe less
 
 const cameraFOV = 100
 const cameraNear = 0.1
@@ -32,8 +32,14 @@ const columns = metadata_ahn3.columns
 const rows = metadata_ahn3.rows
 const levels = metadata_ahn3.levels
 
-const maxHeightNoZoom = 12
-const zoomDelta = maxHeightNoZoom / levels.length
+let zoomFactor = 16
+const fpsTarget = 60
+const nAverage = 60
+const fpsAverage: number[] = []
+for (let i = 0; i < nAverage; i++) {
+    fpsAverage.push(fpsTarget)
+}
+const maxLevelChangeCount = 2 * nAverage
 
 const toFetchAHN3: ChunkBufferInfo[] = []
 const toFetchAHN2: ChunkBufferInfo[] = []
@@ -43,6 +49,7 @@ type ChunkBufferInfo = {
     x: number,
     z: number,
     level: number,
+    levelChangeCount: number,
     minBufferIdx: number,
     length: number,
 }
@@ -83,6 +90,7 @@ function createChunkInfoMap(chunkIds: string[], buffer_idxs: number[]): ChunkInf
             level: level,
             z: z,
             x: -x,
+            levelChangeCount: 0,
             minBufferIdx: buffer_idxs[i],
             length: buffer_idxs[i + 1] - buffer_idxs[i],
         }
@@ -140,10 +148,10 @@ const fragmentShader = `
 const materialAHN3 = new THREE.ShaderMaterial({
     uniforms: {
         color1: {
-            value: new THREE.Color(0x5800FF),
+            value: new THREE.Color(0xFF8000),
         },
         color2: {
-            value: new THREE.Color(0x72FFFF)
+            value: new THREE.Color(0xFFFBB6)
         }
     },
     vertexShader: vertexShader,
@@ -154,10 +162,10 @@ const materialAHN3 = new THREE.ShaderMaterial({
 const materialAHN2 = new THREE.ShaderMaterial({
     uniforms: {
         color1: {
-            value: new THREE.Color(0xFF00E4),
+            value: new THREE.Color(0x03045E),
         },
         color2: {
-            value: new THREE.Color(0xFFEDED)
+            value: new THREE.Color(0xCAF0F8)
         }
     },
     vertexShader: vertexShader,
@@ -167,6 +175,7 @@ const materialAHN2 = new THREE.ShaderMaterial({
 // const materialAHN2 = new THREE.MeshPhongMaterial({
 //     color: 0xFF0000,    // red (can also use a CSS color string here)
 //     flatShading: true,
+//     side: THREE.DoubleSide
 // });
 
 const meshAHN3 = new THREE.Mesh(geometryAHN3, materialAHN3)
@@ -313,8 +322,8 @@ function initScene(ref: React.RefObject<HTMLElement>): { trackedObjects: Tracked
     const skyboxMesh = createSkyboxMesh()
     scene.add(skyboxMesh);
 
-    const axesHelper = new THREE.AxesHelper(5);
-    scene.add(axesHelper);
+    const axesHelper = new THREE.AxesHelper(5)
+    scene.add(axesHelper)
 
     scene.add(meshAHN3)
     scene.add(meshAHN2)
@@ -327,16 +336,14 @@ function initScene(ref: React.RefObject<HTMLElement>): { trackedObjects: Tracked
 
 
     window.onresize = function () {
-
         camera.aspect = window.innerWidth / window.innerHeight;
         camera.updateProjectionMatrix();
-
         renderer.setSize(window.innerWidth, window.innerHeight);
-
-    };
+    }
 
     function animate() {
-        updateChunks(camera.position.x, camera.position.y, camera.position.z)
+        const delta = clock.getDelta()
+        updateChunks(delta, camera.position.x, camera.position.y, camera.position.z)
         for (let i = 0; i < nFetchPerFrame && toFetchAHN3.length > 0; i++) {
             const chunkToFetch = toFetchAHN3.pop()
             if (chunkToFetch !== undefined) {
@@ -351,7 +358,6 @@ function initScene(ref: React.RefObject<HTMLElement>): { trackedObjects: Tracked
         }
 
         requestAnimationFrame(animate)
-        const delta = clock.getDelta()
         controls.update(delta)
         renderer.render(scene, camera)
     }
@@ -432,56 +438,59 @@ async function fetchChunk(ahn: number, chunkId: string, level: number): Promise<
     return positions
 }
 
-async function updateChunks(x: number, y: number, z: number): Promise<void> {
+function updateChunks(delta: number, x: number, y: number, z: number) {
     for (const id of metadata_ahn2.chunkIds.combined) {
         const chunkInfo = chunkInfoMapAHN2[id]
-        const calculatedLevel = calculateLevel(chunkInfo, x, y, z)
+        const calculatedLevel = calculateLevel(chunkInfo, delta, x, y, z)
         if (calculatedLevel !== chunkInfo.level && levelChunkIdMapAHN2[calculatedLevel].includes(id)) {
-            chunkInfo.level = calculatedLevel
-            toFetchAHN2.push(chunkInfo)
+            if (chunkInfo.levelChangeCount < maxLevelChangeCount) {
+                chunkInfo.levelChangeCount++
+            } else {
+                chunkInfo.level = calculatedLevel
+                chunkInfo.levelChangeCount = 0
+                toFetchAHN2.push(chunkInfo)
+            }
         }
     }
     for (const id of metadata_ahn3.chunkIds.combined) {
         const chunkInfo = chunkInfoMapAHN3[id]
-        const calculatedLevel = calculateLevel(chunkInfo, x, y, z)
+        const calculatedLevel = calculateLevel(chunkInfo, delta, x, y, z)
         if (calculatedLevel !== chunkInfo.level && levelChunkIdMapAHN3[calculatedLevel].includes(id)) {
-            chunkInfo.level = calculatedLevel
-            toFetchAHN3.push(chunkInfo)
+            if (chunkInfo.levelChangeCount < maxLevelChangeCount) {
+                chunkInfo.levelChangeCount++
+            } else {
+                chunkInfo.level = calculatedLevel
+                chunkInfo.levelChangeCount = 0
+                toFetchAHN3.push(chunkInfo)
+            }
         }
     }
 }
 
-function calculateLevel(chunk: ChunkBufferInfo, x: number, y: number, z: number): number {
+function calculateLevel(chunk: ChunkBufferInfo, delta: number, x: number, y: number, z: number): number {
     const x_dist = Math.pow(chunk.x - x, 2)
     const z_dist = Math.pow(chunk.z - z, 2)
     const dist = (x_dist + z_dist)
+    fpsAverage.push(1 / delta)
+    fpsAverage.shift()
+    const fpsCurrent = fpsAverage.reduce((a, b) => a + b, 0) / nAverage
+    if (fpsCurrent < fpsTarget * 0.5) {
+        zoomFactor *= 0.995
+    } else if (fpsCurrent < fpsTarget * 0.75) {
+        zoomFactor *= 0.999
+    } else if (fpsCurrent > fpsTarget * 1.5) {
+        zoomFactor *= 1.005
+    } else if (fpsCurrent > fpsTarget * 1.25) {
+        zoomFactor *= 1.001
+    }
+    zoomFactor = Math.max(1, zoomFactor)
+    zoomFactor = Math.min(64, zoomFactor)
     for (let i = 0; i < levels.length - 1; i++) {
-        if ((dist < (zRange + xRange) * 16) && y < maxY * 8) {
+        if ((dist < (zRange + xRange) * zoomFactor) && y < maxY * 8) {
             return levels[i]
         }
     }
-    // for (let i = 0; i < levels.length-2; i++) {
-    //     if ((dist < 2.5) && y < ((i + 3) * zoomDelta)) { // i would say the dist needs to be flipped but then the behaviour is wrong?
-    //         return levels[i+1]
-    //     }
-    // }
-    // for (let i = 0; i < levels.length-1; i++) {
-    //     if ((dist < 1.5) && y < ((i + 1) * zoomDelta)) { // i would say the dist needs to be flipped but then the behaviour is wrong?
-    //         return levels[i]
-    //     }
-    // }
     return levels[levels.length - 1]
-}
-
-function createMesh(name?: string): [THREE.Mesh, THREE.LineSegments] {
-    if (typeof name !== 'undefined') {
-    }
-    const edges = new THREE.EdgesGeometry(geometryAHN3);
-    const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({
-        color: shade('#006994', -0.5),
-        linewidth: 3,  // Due to limitations of the OpenGL Core Profile with the WebGL renderer on most platforms linewidth will always be 1 regardless of the set value.
-    }));
-    return [meshAHN3, line]
 }
 
 export default Renderer
