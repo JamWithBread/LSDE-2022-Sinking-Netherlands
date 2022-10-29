@@ -28,7 +28,7 @@ class FlyControls extends THREE.EventDispatcher {
         this.camera = camera
         this.domElement = domElement
 
-        this.movementSpeed = 1.0
+        this.movementSpeed = 0.01
         this.movementSpeedMultiplier = 1.0
         this.rollSpeed = 0.005
 
@@ -71,7 +71,6 @@ class FlyControls extends THREE.EventDispatcher {
 
         window.addEventListener('keydown', this._keydown)
         window.addEventListener('keyup', this._keyup)
-
         this.updateMovementVector()
         this.updateRotationVector()
     }
@@ -80,6 +79,8 @@ class FlyControls extends THREE.EventDispatcher {
         if (event.altKey) {
             return;
         }
+        const movementSpeedFoo = 100
+        const zoomSpeed = 500
         switch (event.code) {
             // case 'ShiftLeft':
             // case 'ShiftRight':
@@ -87,17 +88,17 @@ class FlyControls extends THREE.EventDispatcher {
             //     break;
 
             case 'KeyW':
-                this.moveState.up = 1;
+                this.moveState.up = movementSpeedFoo;
                 break;
             case 'KeyS':
-                this.moveState.down = 1;
+                this.moveState.down = movementSpeedFoo;
                 break;
 
             case 'KeyA':
-                this.moveState.left = 1;
+                this.moveState.left = movementSpeedFoo;
                 break;
             case 'KeyD':
-                this.moveState.right = 1;
+                this.moveState.right = movementSpeedFoo;
                 break;
             //
             // case 'KeyR':
@@ -108,10 +109,12 @@ class FlyControls extends THREE.EventDispatcher {
             //     break;
 
             case 'ArrowUp':
-                this.moveState.forward = 1;
+                event.preventDefault()
+                this.moveState.back = -zoomSpeed; // dont ask me why forward doesn't work
                 break;
             case 'ArrowDown':
-                this.moveState.back = 1;
+                event.preventDefault()
+                this.moveState.back = zoomSpeed;
                 break;
 
             case 'ArrowLeft':
@@ -162,7 +165,7 @@ class FlyControls extends THREE.EventDispatcher {
             //     break;
             //
             case 'ArrowUp':
-                this.moveState.forward = 0;
+                this.moveState.back = 0;
                 break;
             case 'ArrowDown':
                 this.moveState.back = 0;
