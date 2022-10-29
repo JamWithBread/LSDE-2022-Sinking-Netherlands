@@ -199,6 +199,7 @@ const waterMaterial = new THREE.MeshBasicMaterial({color: 0x005477})
 const waterMesh = new THREE.Mesh(waterGeometry, waterMaterial);
 const waterName = "water"
 waterMesh.name = waterName
+waterMesh.visible = false
 
 type RenderProps = {
     isRenderingMeshAHN3: boolean
@@ -265,10 +266,10 @@ function Renderer(props: RenderProps) {
         }
 
         const positions_current = mesh.geometry.attributes.position.array;
-
+        const convertedWaterHeight = (((props.waterHeight / 100) - 0.5) * (yRange))
         for (let i = 1; i < positions_current.length; i += 3) {
             // @ts-ignore
-            positions_current[i] = props.waterHeight
+            positions_current[i] = convertedWaterHeight
         }
         mesh.geometry.attributes.position.needsUpdate = true
     }, [props.waterHeight])

@@ -1,5 +1,4 @@
 import React from 'react'
-
 type ToolbarProps = {
     isRenderingMeshAHN3: boolean,
     toggleRenderingMeshAHN3: () => void,
@@ -13,7 +12,7 @@ type ToolbarProps = {
 
 function Toolbar(props: ToolbarProps) {
     function handleSliderChange(e: React.ChangeEvent<HTMLInputElement>) {
-        props.setWaterHeight(parseFloat(e.target.value)/1000)
+        props.setWaterHeight((parseFloat(e.target.value)))
     }
     return (
         <div>
@@ -32,7 +31,7 @@ function Toolbar(props: ToolbarProps) {
                     Toggle Water
                 </button>
             </div>
-            <div className="slidecontainer">
+            <div>
                 <input type="range" min="0" max="100" className="slider"
                        value={props.waterHeight}
                        onChange={handleSliderChange}/>
