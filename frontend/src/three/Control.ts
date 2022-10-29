@@ -118,9 +118,11 @@ class FlyControls extends THREE.EventDispatcher {
                 break;
 
             case 'ArrowLeft':
+                event.preventDefault()
                 this.moveState.yawLeft = 1;
                 break;
             case 'ArrowRight':
+                event.preventDefault()
                 this.moveState.yawRight = 1;
                 break;
 
