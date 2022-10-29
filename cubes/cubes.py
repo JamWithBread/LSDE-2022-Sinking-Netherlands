@@ -16,8 +16,8 @@ import utils
 parser = argparse.ArgumentParser(description='Create mesh data data dump')
 parser.add_argument('-a', '--ahn', type=int, choices=[2, 3])
 parser.add_argument('-c', '--maxColumns', type=int, help="number of columns of grid on highest granularity",
-                    default=1024)
-parser.add_argument('-r', '--maxRows', type=int, help="number of rows of grid on highest granularity", default=1024)
+                    default=256)
+parser.add_argument('-r', '--maxRows', type=int, help="number of rows of grid on highest granularity", default=512)
 # parser.add_argument('-l', '--levels', type=int, help="number of granularity levels (these might need to be even powers of 4 but this might also just be a bug in the code:)", default=4)
 args = parser.parse_args()
 
@@ -42,7 +42,7 @@ def run(maxColumns, maxRows, ahn):
     magic_value = -0.0891273
     base_path = "../frontend"
     # base_path = "/dbfs/mnt/lsde/group02"
-    create_heightmap_cubes(polygons, args.maxColumns, args.maxRows, levels, bbox, args.ahn, base_path, magic_value)
+    create_heightmap_cubes(polygons, maxColumns, maxRows, levels, bbox, ahn, base_path, magic_value)
 
 
 def get_height(p, df, magic_value=-0.0891273):
