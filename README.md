@@ -2,13 +2,7 @@
 LSDE Assignment 2, Group02
 
 ## TODO
-- Reinier & Jeren
-  - Line 56 in cubes.py is what functionally needs to be replaced by the result of our gridding/tiling
-- Kailhan
-    - Figure out if we can have different granularities than "0" and "3" atm
-- Other stuff
-  - Tweak scaling
-  - Tweak rendering performance parameters e.g. how many chunks to fetch/distance
+- Write report
 
 ## To Run
 - Run the `### THIS CELL !!! ###` in Combining grid files notebook, afterwards:
