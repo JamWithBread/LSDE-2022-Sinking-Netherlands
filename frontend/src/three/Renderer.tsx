@@ -1,7 +1,6 @@
 import React, {useEffect, useRef, useState} from 'react'
 import * as THREE from 'three'
 import {FlyControls} from './Control'
-import {shade} from "../utils/color"
 import axios from 'axios'
 import axiosRetry from 'axios-retry';
 import metadata_ahn3 from '../chunks/ahn3/_metadata.json'
@@ -34,7 +33,7 @@ const levels = metadata_ahn3.levels
 
 let zoomFactor = 16
 const fpsTarget = 60
-const nAverage = 60
+const nAverage = 20
 const fpsAverage: number[] = []
 for (let i = 0; i < nAverage; i++) {
     fpsAverage.push(fpsTarget)
@@ -474,14 +473,14 @@ function calculateLevel(chunk: ChunkBufferInfo, delta: number, x: number, y: num
     fpsAverage.push(1 / delta)
     fpsAverage.shift()
     const fpsCurrent = fpsAverage.reduce((a, b) => a + b, 0) / nAverage
-    if (fpsCurrent < fpsTarget * 0.5) {
-        zoomFactor *= 0.995
-    } else if (fpsCurrent < fpsTarget * 0.75) {
-        zoomFactor *= 0.999
+    if (fpsCurrent < fpsTarget * 0.25) {
+        zoomFactor *= 0.9995
+    } else if (fpsCurrent < fpsTarget * 0.5) {
+        zoomFactor *= 0.9999
     } else if (fpsCurrent > fpsTarget * 1.5) {
-        zoomFactor *= 1.005
-    } else if (fpsCurrent > fpsTarget * 1.25) {
-        zoomFactor *= 1.001
+        zoomFactor *= 1.000005
+    } else if (fpsCurrent > fpsTarget * 1.2) {
+        zoomFactor *= 1.000001
     }
     zoomFactor = Math.max(1, zoomFactor)
     zoomFactor = Math.min(64, zoomFactor)
