@@ -10,6 +10,8 @@ public_path = '../frontend/public/chunks'
 src_path = '../frontend/src/chunks'
 
 for ahn in ["ahn2", "ahn3"]:
+    os.system(f'mkdir {public_path}/{ahn}')
+    os.system(f'mkdir {src_path}/{ahn}')
     shutil.rmtree(f'{public_path}/{ahn}')
     shutil.rmtree(f'{src_path}/{ahn}')
 

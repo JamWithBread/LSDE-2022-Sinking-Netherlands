@@ -1,17 +1,17 @@
 import json
-import shapely
+# import shapely
 import os
 
 
-def create_polygons(points, parts):
-    polygons = []
-    for i in range(len(parts)):
-        start = parts[i]
-        end = parts[i + 1] if i != (len(parts) - 1) else None
-        polygon = shapely.geometry.Polygon(shapely.geometry.LinearRing(points[start:end]))
-        polygons.append(polygon)
-    return polygons
-
+# def create_polygons(points, parts):
+#     polygons = []
+#     for i in range(len(parts)):
+#         start = parts[i]
+#         end = parts[i + 1] if i != (len(parts) - 1) else None
+#         polygon = shapely.geometry.Polygon(shapely.geometry.LinearRing(points[start:end]))
+#         polygons.append(polygon)
+#     return polygons
+#
 
 def store_positions_as_json(positions, path):
     positions_dict = {
