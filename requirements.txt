@@ -3,6 +3,7 @@ alphashape
 pyshp
 trimesh
 tripy
+fastparquet
 descartes
 perlin-noise
 laspy~=2.2.0
