@@ -483,7 +483,7 @@ function calculateLevel(chunk: ChunkBufferInfo, delta: number, x: number, y: num
         zoomFactor += (0.000033 * delta)
     }
     zoomFactor = Math.max(1, zoomFactor)
-    zoomFactor = Math.min(64, zoomFactor)
+    zoomFactor = Math.min(1024, zoomFactor)
     for (let i = 0; i < levels.length - 1; i++) {
         if ((dist < (zRange + xRange) * zoomFactor) && y < maxY * 8) {
             return levels[i]
