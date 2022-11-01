@@ -47,6 +47,7 @@ function Toolbar(props: ToolbarProps) {
                 <p> Current water
                     level: {props.isRenderingWater ? (((props.waterHeight / 100) - 0.5) * (yRange)).toFixed(2) : "-"}</p>
             </div>
+            <br></br>
             <div>
                 <p><code>W</code> Up</p>
                 <p><code>A</code> Left</p>
@@ -59,9 +60,30 @@ function Toolbar(props: ToolbarProps) {
                 <p><code>&#8592;</code> Tilt left</p>
                 <p><code>&#8594;</code> Tilt right</p>
             </div>
+            <br></br>
+            <div>
+                <p>
+                    <i>
+                        It can take a few seconds before the map starts loading.
+                    </i>
+                </p>
+            </div>
             <footer>
-                <p>GROUP 02</p>
-                <p>The Sinking Netherlands</p>
+                <p>
+                    <small>
+                        Group 02
+                    </small>
+                </p>
+                <p>
+                    <small>
+                        The Sinking Netherlands
+                    </small>
+                </p>
+                <p>
+                    <small>
+                        Reinier van Elderen, Kailhan Hokstam & Jeren Olsen
+                    </small>
+                </p>
 
             </footer>
         </div>
