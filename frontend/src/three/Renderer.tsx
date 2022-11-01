@@ -33,7 +33,7 @@ const levels = metadata_ahn3.levels
 
 let zoomFactor = 16
 const fpsTarget = 60
-const nAverage = 20
+const nAverage = 50
 const fpsAverage: number[] = []
 for (let i = 0; i < nAverage; i++) {
     fpsAverage.push(fpsTarget)
@@ -474,13 +474,13 @@ function calculateLevel(chunk: ChunkBufferInfo, delta: number, x: number, y: num
     fpsAverage.shift()
     const fpsCurrent = fpsAverage.reduce((a, b) => a + b, 0) / nAverage
     if (fpsCurrent < fpsTarget * 0.25) {
-        zoomFactor *= 0.9995
+        zoomFactor -= (0.0005 * delta)
     } else if (fpsCurrent < fpsTarget * 0.5) {
-        zoomFactor *= 0.9999
+        zoomFactor -= (0.00025 * delta)
     } else if (fpsCurrent > fpsTarget * 1.5) {
-        zoomFactor *= 1.000005
+        zoomFactor += (0.000066 * delta)
     } else if (fpsCurrent > fpsTarget * 1.2) {
-        zoomFactor *= 1.000001
+        zoomFactor += (0.000033 * delta)
     }
     zoomFactor = Math.max(1, zoomFactor)
     zoomFactor = Math.min(64, zoomFactor)
